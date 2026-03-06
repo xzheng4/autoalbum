@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+
+{% block title %}照片详情{% endblock %}
+
+{% block extra_css %}
+<style>
+    .detail-container {
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+
+    .main-image {
+        max-width: 100%;
+        max-height: 80vh;
+        border-radius: 8px;
+    }
+
+    .info-section {
+        background: white;
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+    }
+
+    .info-label {
+        font-weight: 600;
+        color: #666;
+        margin-right: 0.5rem;
+    }
+
+    .tag {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        background: #e9ecef;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        margin: 0.125rem;
+    }
+
+    .face-tag {
+        background: #d4edda;
+        color: #155724;
+    }
+
+    .exif-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 0.5rem;
+    }
+
+    .exif-item {
+        padding: 0.5rem;
+        background: #f8f9fa;
+        border-radius: 4px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="detail-container">
+    <!-- 返回链接 -->
+    <div class="mb-3">
+        <a href="/gallery" class="text-decoration-none">
+            <i class="bi bi-arrow-left"></i> 返回画廊
+        </a>
+    </div>
+
+    <!-- 主图 -->
+    <div class="card mb-4">
+        <div class="card-body text-center">
+            {% if full_image %}
+            <img src="data:image/jpeg;base64,{{ full_image }}" class="main-image" alt="Photo">
+            {% else %}
+            <div class="alert alert-warning">
+                <i class="bi bi-exclamation-triangle"></i>
+                原图文件不存在：{{ image.file_path }}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- 左侧：VL 分析结果 -->
+        <div class="col-lg-8">
+            {% if vl_analysis %}
+            <!-- OCR 文字 -->
+            {% if vl_analysis.ocr_text %}
+            <div class="info-section">
+                <h5><i class="bi bi-text-paragraph"></i> OCR 文字</h5>
+                <p class="mb-0">{{ vl_analysis.ocr_text }}</p>
+            </div>
+            {% endif %}
+
+            <!-- 场景描述 -->
+            {% if vl_analysis.scene_description %}
+            <div class="info-section">
+                <h5><i class="bi bi-image"></i> 场景描述</h5>
+                <p class="mb-0">{{ vl_analysis.scene_description }}</p>
+            </div>
+            {% endif %}
+
+            <!-- 分类和物体 -->
+            <div class="info-section">
+                <h5><i class="bi bi-tags"></i> 标签</h5>
+                {% if vl_analysis.category %}
+                <span class="tag tag-primary">{{ vl_analysis.category }}</span>
+                {% endif %}
+                {% if vl_analysis.objects %}
+                    {% for obj in vl_analysis.objects %}
+                    <span class="tag">{{ obj }}</span>
+                    {% endfor %}
+                {% endif %}
+                {% if vl_analysis.mood %}
+                <span class="tag"><i class="bi bi-heart"></i> {{ vl_analysis.mood }}</span>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <!-- 人脸信息 -->
+            {% if faces %}
+            <div class="info-section">
+                <h5><i class="bi bi-people"></i> 检测到的人脸</h5>
+                {% for face in faces %}
+                <span class="tag face-tag">
+                    <i class="bi bi-person-circle"></i>
+                    {{ face.person_name }}
+                    {% if face.confidence %}
+                    ({{ "%.0f"|format(face.confidence * 100) }}%)
+                    {% endif %}
+                </span>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- 右侧：EXIF 和文件信息 -->
+        <div class="col-lg-4">
+            <!-- 文件信息 -->
+            <div class="info-section">
+                <h5><i class="bi bi-file-earmark"></i> 文件信息</h5>
+                <div class="mb-2">
+                    <span class="info-label">路径:</span>
+                    <small class="text-muted">{{ image.file_path }}</small>
+                </div>
+                {% if image.format %}
+                <div class="mb-2">
+                    <span class="info-label">格式:</span> {{ image.format }}
+                </div>
+                {% endif %}
+                {% if image.width and image.height %}
+                <div class="mb-2">
+                    <span class="info-label">尺寸:</span> {{ image.width }} x {{ image.height }}
+                </div>
+                {% endif %}
+                {% if image.file_size %}
+                <div class="mb-2">
+                    <span class="info-label">大小:</span> {{ (image.file_size / 1024 / 1024)|round(2) }} MB
+                </div>
+                {% endif %}
+                {% if image.captured_at %}
+                <div class="mb-2">
+                    <span class="info-label">拍摄时间:</span> {{ image.captured_at }}
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- EXIF 详情 -->
+            {% if exif and (exif.make or exif.model or exif.iso or exif.aperture) %}
+            <div class="info-section">
+                <h5><i class="bi bi-camera"></i> 拍摄参数</h5>
+                <div class="exif-grid">
+                    {% if exif.make %}
+                    <div class="exif-item">
+                        <div class="text-muted small">品牌</div>
+                        <div>{{ exif.make }}</div>
+                    </div>
+                    {% endif %}
+                    {% if exif.model %}
+                    <div class="exif-item">
+                        <div class="text-muted small">型号</div>
+                        <div>{{ exif.model }}</div>
+                    </div>
+                    {% endif %}
+                    {% if exif.iso %}
+                    <div class="exif-item">
+                        <div class="text-muted small">ISO</div>
+                        <div>{{ exif.iso }}</div>
+                    </div>
+                    {% endif %}
+                    {% if exif.aperture %}
+                    <div class="exif-item">
+                        <div class="text-muted small">光圈</div>
+                        <div>f/{{ exif.aperture }}</div>
+                    </div>
+                    {% endif %}
+                    {% if exif.shutter_speed %}
+                    <div class="exif-item">
+                        <div class="text-muted small">快门</div>
+                        <div>{{ exif.shutter_speed }}</div>
+                    </div>
+                    {% endif %}
+                    {% if exif.focal_length %}
+                    <div class="exif-item">
+                        <div class="text-muted small">焦距</div>
+                        <div>{{ exif.focal_length }}mm</div>
+                    </div>
+                    {% endif %}
+                    {% if exif.gps_lat and exif.gps_lon %}
+                    <div class="exif-item">
+                        <div class="text-muted small">GPS</div>
+                        <div>{{ exif.gps_lat|round(4) }}, {{ exif.gps_lon|round(4) }}</div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- 操作按钮 -->
+    <div class="text-center mt-4">
+        {% if file_exists %}
+        <a href="/image/{{ image.id }}/full" class="btn btn-primary" download>
+            <i class="bi bi-download"></i> 下载原图
+        </a>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,1 @@
+// PhotoWeb static scripts

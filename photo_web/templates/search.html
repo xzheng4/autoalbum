@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}搜索{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">
+    <i class="bi bi-search"></i> 搜索照片
+</h2>
+
+<!-- 搜索框 -->
+<form class="mb-4" action="/search" method="GET">
+    <div class="input-group input-group-lg">
+        <input type="text" class="form-control" name="q" value="{{ query }}"
+               placeholder="搜索 OCR 文字、分类、人物名..." autofocus>
+        <button class="btn btn-primary" type="submit">
+            <i class="bi bi-search"></i> 搜索
+        </button>
+    </div>
+</form>
+
+{% if query %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4>
+        {% if results %}
+            找到 {{ total }} 张相关照片
+        {% else %}
+            未找到相关照片
+        {% endif %}
+    </h4>
+    <span class="text-muted">搜索："{{ query }}"</span>
+</div>
+
+{% if results %}
+<div class="photo-grid">
+    {% for img in results %}
+    <div class="photo-card" onclick="location.href='/image/{{ img.id }}'">
+        <img src="data:image/jpeg;base64,{{ img.thumbnail }}" alt="Photo"
+             title="{% if img.ocr_text %}OCR: {{ img.ocr_text[:50] }}... {% endif %}
+{% if img.category %}分类：{{ img.category }}{% endif %}">
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+{% else %}
+<div class="text-center text-muted py-5">
+    <i class="bi bi-search" style="font-size: 4rem;"></i>
+    <p class="mt-3">输入关键词搜索照片</p>
+    <p class="small">支持搜索：OCR 文字、图片分类、人物名称、场景描述</p>
+</div>
+{% endif %}
+{% endblock %}

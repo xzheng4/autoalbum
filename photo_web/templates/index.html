@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}首页{% endblock %}
+
+{% block content %}
+<!-- 统计卡片 -->
+<div class="row mb-4">
+    <div class="col-md-4 mb-3">
+        <div class="stat-card">
+            <div class="stat-number">{{ total_images }}</div>
+            <div class="stat-label">总照片数</div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="stat-card">
+            <div class="stat-number">{{ processed_images }}</div>
+            <div class="stat-label">已处理</div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="stat-card">
+            <div class="stat-number">{{ persons|length }}</div>
+            <div class="stat-label">家庭成员</div>
+        </div>
+    </div>
+</div>
+
+<!-- 快速链接 -->
+{% if persons %}
+<div class="card mb-4">
+    <div class="card-header">
+        <i class="bi bi-people"></i> 家庭成员
+    </div>
+    <div class="card-body">
+        {% for person in persons %}
+        <a href="/person/{{ person }}" class="person-badge text-decoration-none">
+            <i class="bi bi-person-circle"></i> {{ person }}
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- 按日期分组 -->
+<div class="date-groups">
+    <h3 class="mb-3">
+        <i class="bi bi-calendar3"></i> 最近照片
+    </h3>
+
+    {% if date_groups %}
+        {% for group in date_groups %}
+        <div class="date-group">
+            <div class="date-header">
+                <i class="bi bi-calendar-event"></i> {{ group.date_group }}
+                <span class="text-muted">({{ group.count }} 张)</span>
+            </div>
+
+            <div class="photo-grid">
+                {% for img in group.preview_images %}
+                <div class="photo-card" onclick="location.href='/image/{{ img.id }}'">
+                    <img src="data:image/jpeg;base64,{{ img.thumbnail }}" alt="Photo">
+                </div>
+                {% endfor %}
+
+                <div class="photo-card" onclick="location.href='/gallery'">
+                    <div class="d-flex align-items-center justify-content-center h-100"
+                         style="background: #f8f9fa; min-height: 200px;">
+                        <div class="text-center text-muted">
+                            <i class="bi bi-grid-3x3-gap" style="font-size: 2rem;"></i>
+                            <div class="mt-2">查看全部</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i>
+            暂无照片。请先运行照片分析器处理照片。
+            <br><br>
+            <code>python -m photo_analyzer.main analyze</code>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

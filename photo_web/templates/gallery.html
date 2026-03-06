@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}画廊{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>
+        <i class="bi bi-grid"></i> 画廊
+    </h2>
+    <div>
+        <span class="text-muted">{{ total }} 张照片</span>
+    </div>
+</div>
+
+{% if images %}
+<div class="photo-grid">
+    {% for img in images %}
+    <div class="photo-card" onclick="location.href='/image/{{ img.id }}'">
+        <img src="data:image/jpeg;base64,{{ img.thumbnail }}" alt="Photo"
+             title="{{ img.file_path }}
+{% if img.captured_at %}拍摄：{{ img.captured_at }}{% endif %}">
+    </div>
+    {% endfor %}
+</div>
+
+<!-- 分页 -->
+<nav>
+    <ul class="pagination">
+        <li class="page-item {% if page <= 1 %}disabled{% endif %}">
+            <a class="page-link" href="/gallery?page={{ page - 1 }}">
+                <i class="bi bi-chevron-left"></i> 上一页
+            </a>
+        </li>
+
+        {% for p in range(1, total_pages + 1) %}
+            {% if p == page %}
+                <li class="page-item active">
+                    <span class="page-link">{{ p }}</span>
+                </li>
+            {% elif p == 1 or p == total_pages or (p >= page - 2 and p <= page + 2) %}
+                <li class="page-item">
+                    <a class="page-link" href="/gallery?page={{ p }}">{{ p }}</a>
+                </li>
+            {% elif p == page - 3 or p == page + 3 %}
+                <li class="page-item disabled">
+                    <span class="page-link">...</span>
+                </li>
+            {% endif %}
+        {% endfor %}
+
+        <li class="page-item {% if page >= total_pages %}disabled{% endif %}">
+            <a class="page-link" href="/gallery?page={{ page + 1 }}">
+                下一页 <i class="bi bi-chevron-right"></i>
+            </a>
+        </li>
+    </ul>
+</nav>
+
+{% else %}
+<div class="alert alert-info">
+    <i class="bi bi-info-circle"></i>
+    暂无照片。请先运行照片分析器处理照片。
+    <br><br>
+    <code>python -m photo_analyzer.main analyze</code>
+</div>
+{% endif %}
+{% endblock %}
