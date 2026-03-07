@@ -161,15 +161,8 @@ class VLAnalyzer:
         if not self._initialized:
             self.initialize()
 
-        results = []
-
-        # 按 batch_size 分组处理
-        for i in range(0, len(image_paths), self.batch_size):
-            batch = image_paths[i:i + self.batch_size]
-            batch_results = self._process_batch(batch)
-            results.extend(batch_results)
-
-        return results
+        # 直接处理所有图片，由调用者负责分批
+        return self._process_batch(image_paths)
 
     def _process_batch(self, image_paths: List[str]) -> List[Optional[Dict[str, Any]]]:
         """
@@ -209,12 +202,19 @@ class VLAnalyzer:
                 return results
 
             # 批量推理 - vLLM 0.16.0 支持传入列表一次性处理多个请求
-            # llm.chat() 可以直接传入 List[Dict] 批量处理
-            outputs = self.llm.chat(
-                messages=messages_list,
-                sampling_params=self.sampling_params,
-                use_tqdm=False
-            )
+            # 抑制 vLLM 的 "Adding requests" 和 "Processed prompts" 进度输出
+            import sys
+            import io
+            old_stderr = sys.stderr
+            sys.stderr = io.StringIO()
+            try:
+                outputs = self.llm.chat(
+                    messages=messages_list,
+                    sampling_params=self.sampling_params,
+                    use_tqdm=False
+                )
+            finally:
+                sys.stderr = old_stderr
 
             # 解析结果并映射回原始索引
             for i, output in enumerate(outputs):

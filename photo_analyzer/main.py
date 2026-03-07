@@ -243,19 +243,20 @@ class PhotoAnalyzer:
 
         batches = [all_images[i:i + batch_size] for i in range(0, len(all_images), batch_size)]
 
-        for batch_num, batch in enumerate(tqdm(batches, desc="Refreshing VL analysis"), 1):
-            for image in batch:
-                image_path = image['file_path']
-                image_id = image['id']
+        for batch in tqdm(batches, desc="Refreshing VL analysis"):
+            image_paths = [img['file_path'] for img in batch]
+            image_ids = [img['id'] for img in batch]
 
+            # 批量 VL 分析
+            vl_results = self.vl_analyzer.analyze_batch(image_paths)
+
+            # 保存结果
+            for image_id, vl_result in zip(image_ids, vl_results):
                 try:
                     # 删除旧的 VL 分析数据
                     with self.db.get_connection() as conn:
                         conn.execute("DELETE FROM vl_analysis WHERE image_id = ?", (image_id,))
                         conn.commit()
-
-                    # 重新进行 VL 分析
-                    vl_result = self.vl_analyzer.analyze_image(image_path)
 
                     # 保存新的 VL 分析数据
                     if vl_result:
@@ -273,7 +274,7 @@ class PhotoAnalyzer:
                     stats["success"] += 1
 
                 except Exception as e:
-                    print(f"Error processing {image_path}: {e}")
+                    print(f"Error processing image {image_id}: {e}")
                     stats["failed"] += 1
 
         # 打印总结
