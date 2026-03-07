@@ -21,23 +21,23 @@ class VLAnalyzer:
 
     # 分析用的系统提示和指令
     ANALYSIS_PROMPT = """
-You are an expert in image analysis. Analyze the provided image and output a structured JSON response.
+你是一位图片分析专家。请分析提供的图片，并输出结构化的 JSON 响应。
 
-For the image, please provide:
-1. **OCR Text**: All readable text in the image (signs, documents, captions, etc.)
-2. **Scene Description**: A brief description of what's happening in the image
-3. **Category**: Primary category from: [family, travel, food, celebration, sports, nature, pets, work, documents, selfie, group, indoor, outdoor, event, other]
-4. **Objects**: List of main objects/people visible
-5. **Mood/Atmosphere**: The general mood (happy, formal, casual, nostalgic, etc.)
-6. **Confidence**: Your confidence in this analysis (0.0-1.0)
+对于每张图片，请提供以下信息：
+1. **OCR 文字**: 图片中所有可识别的文字（标牌、文档、说明等）
+2. **场景描述**: 简要描述图片中的场景或正在发生的事情
+3. **类别**: 从以下类别中选择主要类别：[家庭、旅游、美食、聚会、运动、自然、宠物、工作、文档、自拍、合影、室内、户外、活动、其他]
+4. **物体**: 列出图片中可见的主要物体/人物
+5. **氛围**: 描述图片的整体氛围（快乐、正式、休闲、怀旧等）
+6. **置信度**: 你对本次分析的置信度（0.0-1.0）
 
-Output ONLY a valid JSON object with this exact structure:
+请仅输出一个有效的 JSON 对象，格式如下：
 {
-    "ocr_text": "extracted text here or empty string if none",
-    "scene_description": "brief description",
-    "category": "category name",
-    "objects": ["object1", "object2", ...],
-    "mood": "mood description",
+    "ocr_text": "提取的文字内容，如果没有则为空字符串",
+    "scene_description": "场景简要描述",
+    "category": "类别名称",
+    "objects": ["物体 1", "物体 2", ...],
+    "mood": "氛围描述",
     "confidence": 0.95
 }
 """
