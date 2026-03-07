@@ -47,12 +47,34 @@ class Database:
                   captured_at: str = None) -> int:
         """添加或更新图片记录"""
         with self.get_connection() as conn:
-            cursor = conn.execute("""
-                INSERT OR REPLACE INTO images
-                (file_path, file_hash, file_size, width, height, format, captured_at, processed)
-                VALUES (?, ?, ?, ?, ?, ?, ?, FALSE)
-            """, (file_path, file_hash, file_size, width, height, format, captured_at))
-            return cursor.lastrowid
+            # 先检查是否已存在
+            cursor = conn.execute(
+                "SELECT id FROM images WHERE file_path = ?", (file_path,)
+            )
+            row = cursor.fetchone()
+
+            if row:
+                # 已存在则更新
+                image_id = row[0]
+                conn.execute("""
+                    UPDATE images SET
+                        file_hash = ?,
+                        file_size = ?,
+                        width = ?,
+                        height = ?,
+                        format = ?,
+                        captured_at = ?
+                    WHERE id = ?
+                """, (file_hash, file_size, width, height, format, captured_at, image_id))
+                return image_id
+            else:
+                # 不存在则插入
+                cursor = conn.execute("""
+                    INSERT INTO images
+                    (file_path, file_hash, file_size, width, height, format, captured_at, processed)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, FALSE)
+                """, (file_path, file_hash, file_size, width, height, format, captured_at))
+                return cursor.lastrowid
 
     def get_image_by_path(self, file_path: str) -> Optional[Dict]:
         """根据路径获取图片记录"""

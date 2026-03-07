@@ -30,12 +30,12 @@ CREATE TABLE IF NOT EXISTS exif_data (
     gps_lat REAL,
     gps_lon REAL,
     gps_alt REAL,
-    FOREIGN KEY (image_id) REFERENCES images(id)
+    FOREIGN KEY (image_id) REFERENCES images(id) ON DELETE CASCADE
 );
 
 -- 人脸信息
 CREATE TABLE IF NOT EXISTS faces (
-    id INTEGER PRIMARY KEY,
+    id PRIMARY KEY,
     image_id INTEGER,
     person_name TEXT,
     face_encoding BLOB,
@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS faces (
     bbox_w INTEGER,
     bbox_h INTEGER,
     confidence REAL,
-    FOREIGN KEY (image_id) REFERENCES images(id)
+    FOREIGN KEY (image_id) REFERENCES images(id) ON DELETE CASCADE
 );
 
 -- OCR 文本和图片理解结果
@@ -56,7 +56,7 @@ CREATE TABLE IF NOT EXISTS vl_analysis (
     objects TEXT,  -- JSON 数组
     mood TEXT,
     confidence REAL,
-    FOREIGN KEY (image_id) REFERENCES images(id)
+    FOREIGN KEY (image_id) REFERENCES images(id) ON DELETE CASCADE
 );
 
 -- 重复照片检测（感知哈希）
@@ -67,8 +67,8 @@ CREATE TABLE IF NOT EXISTS duplicates (
     similarity REAL,
     hash_1 TEXT,
     hash_2 TEXT,
-    FOREIGN KEY (image_id_1) REFERENCES images(id),
-    FOREIGN KEY (image_id_2) REFERENCES images(id)
+    FOREIGN KEY (image_id_1) REFERENCES images(id) ON DELETE CASCADE,
+    FOREIGN KEY (image_id_2) REFERENCES images(id) ON DELETE CASCADE
 );
 
 -- 全文搜索索引 (FTS5)
