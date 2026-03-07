@@ -104,9 +104,16 @@ class ImageScanner:
         Returns:
             添加的图片数量
         """
+        # 先获取所有新图片
+        new_images = self.get_new_images()
+
+        if not new_images:
+            print("No new images to add")
+            return 0
+
         count = 0
 
-        for image_info in self.get_new_images():
+        for image_info in tqdm(new_images, desc="Adding images"):
             try:
                 # 计算文件哈希
                 file_hash = self.exif_extractor.get_file_hash(image_info["file_path"])
