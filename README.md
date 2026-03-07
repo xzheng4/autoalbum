@@ -79,14 +79,14 @@ python -m photo_web.main
 ### 照片分析器
 
 ```bash
+# 指定照片目录
+python -m photo_analyzer.main analyze --photos-dir /path/to/photos
+
 # 指定 batch size (1/2/4/8/16/32)
 python -m photo_analyzer.main analyze --batch-size 4
 
 # 限制处理数量（测试用）
 python -m photo_analyzer.main analyze --limit 100
-
-# 指定照片目录
-python -m photo_analyzer.main scan --photos-dir /path/to/photos
 
 # 刷新人脸信息（保留 VL 分析）
 python -m photo_analyzer.main refresh-faces

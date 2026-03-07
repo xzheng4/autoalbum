@@ -18,10 +18,11 @@ from .duplicate_detector import DuplicateDetector
 class PhotoAnalyzer:
     """照片分析器主类"""
 
-    def __init__(self, db_path: str = None, batch_size: int = None):
+    def __init__(self, db_path: str = None, batch_size: int = None, photos_dir: str = None):
         self.db_path = db_path or str(DATABASE_PATH)
+        self.photos_dir = photos_dir
         self.db = Database(self.db_path)
-        self.scanner = ImageScanner(self.db)
+        self.scanner = ImageScanner(self.db, photos_dir=photos_dir)
         self.exif_extractor = EXIFExtractor()
         self.face_recognizer = FaceRecognizer()
         self.vl_analyzer = VLAnalyzer(batch_size=batch_size)
@@ -382,6 +383,7 @@ def main():
     analyzer = PhotoAnalyzer(
         db_path=args.db,
         batch_size=args.batch_size,
+        photos_dir=args.photos_dir,
     )
 
     try:
