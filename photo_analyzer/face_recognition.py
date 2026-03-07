@@ -1,14 +1,14 @@
 """
 人脸识别模块
-基于 face_recognition 库（dlib）
+基于 insightface 库的 buffalo_l 模型
 """
 import os
 import pickle
 import numpy as np
 from pathlib import Path
-from typing import List, Dict, Optional, Tuple
-from PIL import Image
-import face_recognition
+from typing import List, Dict, Optional
+import cv2
+from insightface.app import FaceAnalysis
 
 from .config import ANALYZER_CONFIG, FACES_DIR
 
@@ -16,15 +16,45 @@ from .config import ANALYZER_CONFIG, FACES_DIR
 class FaceRecognizer:
     """人脸识别器"""
 
-    def __init__(self, known_faces_file: str = None):
-        self.known_faces_file = known_faces_file or str(Path(FACES_DIR) / "known_faces.pkl")
+    def __init__(self):
         self.known_face_names = []
-        self.known_face_encodings = []
-        self.model = ANALYZER_CONFIG.get("face_detection_model", "hog")
+        self.known_face_embeddings = []
         self.tolerance = ANALYZER_CONFIG.get("face_tolerance", 0.6)
+
+        # 初始化 insightface FaceAnalysis 模型
+        self.face_analyzer = None
+        self._init_face_model()
 
         # 每次启动时自动从 data/faces/ 目录刷新已知人脸数据
         self._refresh_known_faces_from_directory()
+
+    def _init_face_model(self):
+        """初始化人脸检测和识别模型"""
+        model_name = ANALYZER_CONFIG.get("face_detection_model", "buffalo_l")
+        print(f"Initializing face recognition model: {model_name}")
+
+        try:
+            # 使用 insightface 的 FaceAnalysis
+            self.face_analyzer = FaceAnalysis(
+                name=model_name,
+                providers=['CUDAExecutionProvider', 'CPUExecutionProvider']
+            )
+            self.face_analyzer.prepare(ctx_id=0, det_size=(640, 640))
+            print(f"Face recognition model '{model_name}' initialized successfully")
+        except Exception as e:
+            print(f"Error initializing face recognition model: {e}")
+            # 如果 buffalo_l 不可用，尝试 buffalo_s（更小更快）
+            try:
+                print("Trying buffalo_s model instead...")
+                self.face_analyzer = FaceAnalysis(
+                    name="buffalo_s",
+                    providers=['CUDAExecutionProvider', 'CPUExecutionProvider']
+                )
+                self.face_analyzer.prepare(ctx_id=0, det_size=(640, 640))
+                print("Face recognition model 'buffalo_s' initialized successfully")
+            except Exception as e2:
+                print(f"Error initializing buffalo_s: {e2}")
+                self.face_analyzer = None
 
     def _refresh_known_faces_from_directory(self):
         """
@@ -33,10 +63,14 @@ class FaceRecognizer:
         目录结构：faces/张三/photo1.jpg, faces/李四/photo2.jpg
         """
         self.known_face_names = []
-        self.known_face_encodings = []
+        self.known_face_embeddings = []
 
         if not FACES_DIR.exists():
             print(f"Faces directory not found: {FACES_DIR}")
+            return
+
+        if not self.face_analyzer:
+            print("Face analyzer not initialized, skipping face refresh")
             return
 
         print("Refreshing known faces from data/faces/ directory...")
@@ -56,18 +90,23 @@ class FaceRecognizer:
                 # 处理每张照片
                 for image_path in image_paths:
                     try:
-                        # 加载图片
-                        image = face_recognition.load_image_file(str(image_path))
+                        # 使用 OpenCV 加载图片
+                        img = cv2.imread(str(image_path))
+                        if img is None:
+                            print(f"  Failed to load image: {image_path}")
+                            continue
 
                         # 检测人脸
-                        face_encodings = face_recognition.face_encodings(image)
+                        faces = self.face_analyzer.get(img)
 
-                        if face_encodings:
+                        if faces:
                             # 取第一张检测到的人脸
-                            self.known_face_encodings.append(face_encodings[0])
-                            self.known_face_names.append(person_name)
-                            person_faces += 1
-                            faces_count += 1
+                            for face in faces:
+                                self.known_face_embeddings.append(face.embedding)
+                                self.known_face_names.append(person_name)
+                                person_faces += 1
+                                faces_count += 1
+                                print(f"  Found face in {image_path}")
                         else:
                             print(f"  No face detected in {image_path}")
 
@@ -77,20 +116,7 @@ class FaceRecognizer:
                 if person_faces > 0:
                     print(f"  Loaded {person_faces} face(s) for {person_name}")
 
-        # 保存缓存（可选，用于加速下次启动）
-        if faces_count > 0:
-            self._save_known_faces()
-
         print(f"Loaded {len(self.known_face_names)} known faces for {len(set(self.known_face_names))} person(s)")
-
-    def _save_known_faces(self):
-        """保存已知人脸数据到缓存文件"""
-        data = {
-            "names": self.known_face_names,
-            "encodings": self.known_face_encodings
-        }
-        with open(self.known_faces_file, "wb") as f:
-            pickle.dump(data, f)
 
     def register_person(self, name: str, image_paths: List[str]) -> bool:
         """
@@ -103,19 +129,26 @@ class FaceRecognizer:
         Returns:
             bool: 是否注册成功
         """
-        encodings = []
+        if not self.face_analyzer:
+            print("Face analyzer not initialized")
+            return False
+
+        embeddings = []
 
         for image_path in image_paths:
             try:
-                # 加载图片
-                image = face_recognition.load_image_file(image_path)
+                # 使用 OpenCV 加载图片
+                img = cv2.imread(str(image_path))
+                if img is None:
+                    print(f"Failed to load image: {image_path}")
+                    continue
 
                 # 检测人脸
-                face_encodings = face_recognition.face_encodings(image)
+                faces = self.face_analyzer.get(img)
 
-                if face_encodings:
+                if faces:
                     # 取第一张检测到的人脸
-                    encodings.append(face_encodings[0])
+                    embeddings.append(faces[0].embedding)
                     print(f"Found face in {image_path}")
                 else:
                     print(f"No face detected in {image_path}")
@@ -123,11 +156,11 @@ class FaceRecognizer:
             except Exception as e:
                 print(f"Error processing {image_path}: {e}")
 
-        if encodings:
-            # 添加新成员的人脸编码（内存中，不保存到缓存）
-            self.known_face_encodings.extend(encodings)
-            self.known_face_names.extend([name] * len(encodings))
-            print(f"Registered {name} with {len(encodings)} face(s)")
+        if embeddings:
+            # 添加新成员的人脸 embedding
+            self.known_face_embeddings.extend(embeddings)
+            self.known_face_names.extend([name] * len(embeddings))
+            print(f"Registered {name} with {len(embeddings)} face(s)")
             return True
         else:
             print(f"Could not register {name}: no faces detected")
@@ -145,53 +178,58 @@ class FaceRecognizer:
         """
         results = []
 
+        if not self.face_analyzer:
+            print("Face analyzer not initialized")
+            return results
+
         try:
-            # 加载图片
-            image = face_recognition.load_image_file(image_path)
-
-            # 检测人脸位置
-            face_locations = face_recognition.face_locations(image, model=self.model)
-
-            if not face_locations:
+            # 使用 OpenCV 加载图片
+            img = cv2.imread(str(image_path))
+            if img is None:
+                print(f"Failed to load image: {image_path}")
                 return results
 
-            # 获取人脸编码
-            face_encodings = face_recognition.face_encodings(image, face_locations)
+            # 检测人脸
+            faces = self.face_analyzer.get(img)
 
-            for i, (face_location, face_encoding) in enumerate(zip(face_locations, face_encodings)):
+            if not faces:
+                return results
+
+            for face in faces:
                 result = {
                     "bbox": None,
                     "person_name": None,
                     "confidence": 0.0,
-                    "face_encoding": face_encoding.tobytes()
+                    "face_embedding": face.embedding.tobytes()
                 }
 
-                # 转换 bbox 格式 (top, right, bottom, left) -> (x, y, w, h)
-                top, right, bottom, left = face_location
-                result["bbox"] = (left, top, right - left, bottom - top)
+                # bbox: [x1, y1, x2, y2] -> (x, y, w, h)
+                bbox = face.bbox.astype(int)
+                result["bbox"] = (
+                    int(bbox[0]),
+                    int(bbox[1]),
+                    int(bbox[2] - bbox[0]),
+                    int(bbox[3] - bbox[1])
+                )
 
                 # 与已知人脸匹配
-                if self.known_face_encodings:
-                    matches = face_recognition.compare_faces(
-                        self.known_face_encodings,
-                        face_encoding,
-                        tolerance=self.tolerance
-                    )
+                if self.known_face_embeddings:
+                    # 计算与所有已知人脸的余弦相似度
+                    similarities = []
+                    for known_embedding in self.known_face_embeddings:
+                        sim = self._cosine_similarity(face.embedding, known_embedding)
+                        similarities.append(sim)
 
-                    # 计算最佳匹配
-                    face_distances = face_recognition.face_distance(
-                        self.known_face_encodings,
-                        face_encoding
-                    )
+                    # 找到最佳匹配
+                    best_match_idx = int(np.argmax(similarities))
+                    best_similarity = similarities[best_match_idx]
 
-                    best_match_idx = np.argmin(face_distances)
-                    if matches[best_match_idx]:
+                    if best_similarity >= self.tolerance:
                         result["person_name"] = self.known_face_names[best_match_idx]
-                        # 置信度 = 1 - 距离
-                        result["confidence"] = float(1 - face_distances[best_match_idx])
+                        result["confidence"] = float(best_similarity)
                     else:
                         result["person_name"] = "未知"
-                        result["confidence"] = float(1 - np.min(face_distances)) if len(face_distances) > 0 else 0.0
+                        result["confidence"] = float(best_similarity)
                 else:
                     result["person_name"] = "未知"
 
@@ -201,6 +239,18 @@ class FaceRecognizer:
             print(f"Error recognizing faces in {image_path}: {e}")
 
         return results
+
+    def _cosine_similarity(self, embedding1: np.ndarray, embedding2: np.ndarray) -> float:
+        """计算两个 embedding 的余弦相似度"""
+        # 归一化
+        emb1_norm = embedding1 / np.linalg.norm(embedding1)
+        emb2_norm = embedding2 / np.linalg.norm(embedding2)
+
+        # 余弦相似度
+        similarity = np.dot(emb1_norm, emb2_norm)
+
+        # 映射到 0-1 范围 (原始范围约 -1 到 1)
+        return (similarity + 1) / 2
 
     def get_registered_persons(self) -> List[str]:
         """获取所有已注册的人物名单"""

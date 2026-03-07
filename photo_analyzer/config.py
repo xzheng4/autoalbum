@@ -22,7 +22,7 @@ FACES_DIR.mkdir(exist_ok=True)
 ANALYZER_CONFIG = {
     "batch_size": 4,  # vLLM 批处理大小：1/2/4/8/16/32
     "max_image_size": 2048,  # 分析前图片最大边长
-    "face_detection_model": "hog",  # face_recognition: 'hog' 或 'cnn'
+    "face_detection_model": "buffalo_l",  # insightface 模型：'buffalo_l' / 'buffalo_s'
     "face_tolerance": 0.6,  # 人脸识别相似度阈值
 }
 
