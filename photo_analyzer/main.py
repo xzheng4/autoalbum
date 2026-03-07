@@ -143,21 +143,19 @@ class PhotoAnalyzer:
 
         # 按 batch_size 分组处理
         batch_size = self.vl_analyzer.batch_size
-        for i in range(0, len(unprocessed), batch_size):
-            batch = unprocessed[i:i + batch_size]
-            batch_num = (i // batch_size) + 1
-            total_batches = (len(unprocessed) + batch_size - 1) // batch_size
+        batches = [unprocessed[i:i + batch_size] for i in range(0, len(unprocessed), batch_size)]
+
+        for batch_num, batch in enumerate(tqdm(batches, desc="Analyzing batches"), 1):
+            total_batches = len(batches)
 
             print(f"\n--- Batch {batch_num}/{total_batches} ---")
 
-            for image_path in batch:
+            for image_path in tqdm(batch, desc=f"Processing images"):
                 success = self.analyze_image(image_path)
                 if success:
                     stats["success"] += 1
                 else:
                     stats["failed"] += 1
-
-            print(f"Progress: {min(i + batch_size, len(unprocessed))}/{len(unprocessed)} images")
 
         # 打印总结
         print("\n" + "=" * 50)
@@ -219,14 +217,15 @@ class PhotoAnalyzer:
         # 批量处理
         stats = {"total": len(all_images), "success": 0, "failed": 0, "updated": 0}
 
-        for i in range(0, len(all_images), batch_size):
-            batch = all_images[i:i + batch_size]
-            batch_num = (i // batch_size) + 1
-            total_batches = (len(all_images) + batch_size - 1) // batch_size
+        batch_size = batch_size or self.vl_analyzer.batch_size
+        batches = [all_images[i:i + batch_size] for i in range(0, len(all_images), batch_size)]
+
+        for batch_num, batch in enumerate(tqdm(batches, desc="Refreshing faces"), 1):
+            total_batches = len(batches)
 
             print(f"\n--- Batch {batch_num}/{total_batches} ---")
 
-            for image in batch:
+            for image in tqdm(batch, desc=f"Processing images"):
                 image_path = image['file_path']
                 image_id = image['id']
 
@@ -256,8 +255,6 @@ class PhotoAnalyzer:
                 except Exception as e:
                     print(f"Error processing {image_path}: {e}")
                     stats["failed"] += 1
-
-            print(f"Progress: {min(i + batch_size, len(all_images))}/{len(all_images)} images")
 
         # 打印总结
         print("\n" + "=" * 50)
@@ -308,14 +305,15 @@ class PhotoAnalyzer:
         # 批量处理
         stats = {"total": len(all_images), "success": 0, "failed": 0, "updated": 0}
 
-        for i in range(0, len(all_images), batch_size):
-            batch = all_images[i:i + batch_size]
-            batch_num = (i // batch_size) + 1
-            total_batches = (len(all_images) + batch_size - 1) // batch_size
+        batch_size = batch_size or self.vl_analyzer.batch_size
+        batches = [all_images[i:i + batch_size] for i in range(0, len(all_images), batch_size)]
+
+        for batch_num, batch in enumerate(tqdm(batches, desc="Refreshing VL analysis"), 1):
+            total_batches = len(batches)
 
             print(f"\n--- Batch {batch_num}/{total_batches} ---")
 
-            for image in batch:
+            for image in tqdm(batch, desc=f"Processing images"):
                 image_path = image['file_path']
                 image_id = image['id']
 
@@ -346,8 +344,6 @@ class PhotoAnalyzer:
                 except Exception as e:
                     print(f"Error processing {image_path}: {e}")
                     stats["failed"] += 1
-
-            print(f"Progress: {min(i + batch_size, len(all_images))}/{len(all_images)} images")
 
         # 打印总结
         print("\n" + "=" * 50)
