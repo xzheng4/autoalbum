@@ -42,14 +42,20 @@
 ### 指令 4: 记录用户指令历史
 请把历史对话中，以及未来对话中，我的输入指令都记录到更新的 prompts.txt 文件中
 
-### 指令 5: 更新 vLLM 模型和 batch 处理
-vLLM 的模型文件更新迭代到 Qwen/Qwen3-VL-4B-Instruct-FP8，并支持 batch=1，2，4，8，16，32 的批量处理。
+### 指令 6: 使用本地模型路径
+将 model_name 改成本地 qwen 模型的绝对路径 /mnt/d/models/Qwen3-VL-4B-Instruct-FP8
 
-更新内容：
-- 更新 config.py 中的模型名称为 Qwen/Qwen3-VL-4B-Instruct-FP8
-- 更新 vl_analyzer.py 中的默认模型名称
-- main.py 中的 analyze_all 方法支持批处理模式
-- batch_size 参数可通过命令行 --batch-size 指定（1/2/4/8/16/32）
+### 指令 7: VL 分析 Prompt 改为中文
+将 photo_analyzer/vl_analyzer.py 中的 ANALYSIS_PROMPT 改成中文，以便更好地适配 Qwen3-VL 中文模型
+
+### 指令 8: 优化批量推理
+将 vl_analyzer.py 的批量图片处理改为真正的并行推理，一次送给 llm 多张图片并分别保存结果
+
+### 指令 9: 添加数据库检查工具
+增加一个访问 autoalbum.db 数据库的 python 代码（tools/check_db.py），从数据库中抽取最后 10 张图片的所有信息并打印出来，提供给开发者检查
+
+### 指令 10: 人脸识别说明
+data/faces 下的每一个子目录都是一个家庭成员的单人照片。人脸识别从每个人的多张图片中提取人脸信息后用于分析 data/photos/ 下面的照片
 
 ---
 
@@ -66,3 +72,19 @@ vLLM 的模型文件更新迭代到 Qwen/Qwen3-VL-4B-Instruct-FP8，并支持 ba
 - [x] HTML 模板（9 个页面）
 - [x] 推送到远程仓库
 - [x] .gitignore 排除 data/ 目录
+- [x] tools/check_db.py 数据库检查工具
+
+---
+
+## 当前系统状态
+
+**数据库统计**:
+- 总图片数：195 张
+- 已处理：195 张
+- 家庭成员：7 人（外公、外婆、奶奶、妈妈、爸爸、郑丁涵、郑丁琳）
+- 人脸记录：509 条
+
+**模型配置**:
+- 人脸检测：insightface buffalo_l
+- VL 分析：Qwen/Qwen3-VL-4B-Instruct-FP8（本地路径：/mnt/d/models/Qwen3-VL-4B-Instruct-FP8）
+- Batch 大小：4（支持 1/2/4/8/16/32）
