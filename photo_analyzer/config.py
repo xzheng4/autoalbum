@@ -28,7 +28,7 @@ ANALYZER_CONFIG = {
 
 # vLLM 配置
 VLLM_CONFIG = {
-    "model_name": "Qwen/Qwen3-VL-4B-Instruct-FP8",  # FP8 量化版本，节省显存
+    "model_name": "/mnt/d/models/Qwen3-VL-4B-Instruct-FP8",  # 本地 Qwen 模型绝对路径
     "tensor_parallel_size": 1,  # GPU 数量
     "max_model_len": 4096,  # 最大上下文长度
     "gpu_memory_utilization": 0.8,  # GPU 显存利用率
