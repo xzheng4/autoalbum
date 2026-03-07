@@ -11,22 +11,6 @@ from contextlib import contextmanager
 from .models import DB_SCHEMA
 
 
-# 数据库迁移 SQL
-MIGRATION_SQL = """
--- 添加新的处理标志列（如果不存在）
-ALTER TABLE images ADD COLUMN exif_processed BOOLEAN DEFAULT FALSE;
-ALTER TABLE images ADD COLUMN face_processed BOOLEAN DEFAULT FALSE;
-ALTER TABLE images ADD COLUMN vl_processed BOOLEAN DEFAULT FALSE;
-
--- 从旧的 processed 字段迁移数据到新字段
-UPDATE images SET
-    exif_processed = processed,
-    face_processed = processed,
-    vl_processed = processed
-WHERE exif_processed IS NULL OR face_processed IS NULL OR vl_processed IS NULL;
-"""
-
-
 class Database:
     """SQLite 数据库操作类"""
 
@@ -51,23 +35,9 @@ class Database:
             conn.close()
 
     def _init_db(self):
-        """初始化数据库 schema 并执行迁移"""
+        """初始化数据库 schema"""
         with self.get_connection() as conn:
             conn.executescript(DB_SCHEMA)
-
-        # 执行数据库迁移（添加新列）
-        self._run_migrations()
-
-    def _run_migrations(self):
-        """
-        数据库迁移：添加新的处理标志列
-        将旧的单个 processed 字段迁移到三个独立的标志字段
-        """
-        try:
-            with self.get_connection() as conn:
-                conn.executescript(MIGRATION_SQL)
-        except sqlite3.Error:
-            pass  # 迁移可能因为列已存在而失败，这是正常的
 
     # ==================== Images 表操作 ====================
 
@@ -101,8 +71,8 @@ class Database:
                 # 不存在则插入
                 cursor = conn.execute("""
                     INSERT INTO images
-                    (file_path, file_hash, file_size, width, height, format, captured_at, processed)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, FALSE)
+                    (file_path, file_hash, file_size, width, height, format, captured_at, exif_processed, face_processed, vl_processed)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, FALSE, FALSE, FALSE)
                 """, (file_path, file_hash, file_size, width, height, format, captured_at))
                 return cursor.lastrowid
 
@@ -210,13 +180,14 @@ class Database:
             return cursor.fetchone() is not None
 
     def is_processed(self, file_path: str) -> bool:
-        """检查图片是否已处理"""
+        """检查图片是否已处理（所有阶段完成）"""
         with self.get_connection() as conn:
             cursor = conn.execute(
-                "SELECT processed FROM images WHERE file_path = ?", (file_path,)
+                """SELECT exif_processed, face_processed, vl_processed FROM images
+                   WHERE file_path = ?""", (file_path,)
             )
             row = cursor.fetchone()
-            return row and row[0]
+            return row and all(row)
 
     def get_image_count(self) -> int:
         """获取图片总数"""
@@ -381,7 +352,7 @@ class Database:
                        COUNT(*) as count,
                        GROUP_CONCAT(id) as ids
                 FROM images
-                WHERE processed = TRUE
+                WHERE vl_processed = TRUE
                 GROUP BY date(captured_at)
                 ORDER BY date_group DESC
                 LIMIT ?
