@@ -60,11 +60,11 @@ class EXIFExtractor:
                         elif tag == 'ISOSpeedRatings':
                             result['iso'] = value
                         elif tag == 'FNumber':
-                            result['aperture'] = float(value) if value else None
+                            result['aperture'] = self._convert_ifd_rational(value)
                         elif tag == 'ExposureTime':
                             result['shutter_speed'] = str(value)
                         elif tag == 'FocalLength':
-                            result['focal_length'] = float(value) if value else None
+                            result['focal_length'] = self._convert_ifd_rational(value)
                         elif tag == 'LensModel':
                             result['lens_model'] = value
                         elif tag == 'DateTimeOriginal':
@@ -123,14 +123,70 @@ class EXIFExtractor:
 
         return result
 
+    def _convert_ifd_rational(self, value) -> Optional[float]:
+        """
+        转换 IFDRational 对象为 float
+
+        IFDRational 是 PIL 处理 EXIF 有理数的类型，可能是：
+        - IFDRational 对象（有 num/denom 属性）
+        - tuple (numerator, denominator)
+        - 普通数字
+        """
+        if value is None:
+            return None
+
+        # 如果是普通数字
+        if isinstance(value, (int, float)):
+            return float(value)
+
+        # 如果是 tuple
+        if isinstance(value, tuple) and len(value) == 2:
+            try:
+                return float(value[0]) / float(value[1])
+            except (ZeroDivisionError, TypeError):
+                return None
+
+        # 如果是 IFDRational 对象（有 num 和 denom 属性）
+        if hasattr(value, 'num') and hasattr(value, 'denom'):
+            try:
+                return float(value.num) / float(value.denom)
+            except (ZeroDivisionError, TypeError):
+                return None
+
+        # 如果是 IFDRational 对象（有 numerator 和 denominator 属性）
+        if hasattr(value, 'numerator') and hasattr(value, 'denominator'):
+            try:
+                return float(value.numerator) / float(value.denominator)
+            except (ZeroDivisionError, TypeError):
+                return None
+
+        # 其他情况尝试直接转换
+        try:
+            return float(value)
+        except (ValueError, TypeError):
+            return None
+
     def _convert_to_degrees(self, value: tuple) -> float:
         """将 GPS 坐标转换为十进制度数"""
         try:
-            d = float(value[0][0]) / float(value[0][1]) if value[0][1] != 0 else 0
-            m = float(value[1][0]) / float(value[1][1]) if value[1][1] != 0 else 0
-            s = float(value[2][0]) / float(value[2][1]) if value[2][1] != 0 else 0
+            def convert_rational(r):
+                """转换单个 IFDRational 值"""
+                if isinstance(r, (int, float)):
+                    return float(r)
+                if isinstance(r, tuple) and len(r) == 2:
+                    return float(r[0]) / float(r[1]) if r[1] != 0 else 0
+                if hasattr(r, 'num') and hasattr(r, 'denom'):
+                    return float(r.num) / float(r.denom) if r.denom != 0 else 0
+                if hasattr(r, 'numerator') and hasattr(r, 'denominator'):
+                    return float(r.numerator) / float(r.denominator) if r.denominator != 0 else 0
+                return float(r)
+
+            d = convert_rational(value[0]) if len(value) > 0 else 0
+            m = convert_rational(value[1]) if len(value) > 1 else 0
+            s = convert_rational(value[2]) if len(value) > 2 else 0
+
             return d + (m / 60.0) + (s / 3600.0)
-        except (ZeroDivisionError, IndexError):
+        except (ZeroDivisionError, IndexError, TypeError):
             return 0.0
 
     def get_file_hash(self, image_path: str) -> str:
