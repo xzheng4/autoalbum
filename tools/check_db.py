@@ -173,6 +173,109 @@ def check_database(db_path: str = None, limit: int = 10):
     print(f"总共有 {total_count} 张图片")
 
 
+def clear_faces(db_path: str = None, confirm: bool = False):
+    """
+    清空所有人脸数据
+
+    Args:
+        db_path: 数据库路径
+        confirm: 是否需要确认
+    """
+    db_path = db_path or str(DATABASE_PATH)
+
+    print_separator("清空人脸数据")
+    print(f"数据库路径：{db_path}")
+
+    if not confirm:
+        response = input("\n确定要清空所有人脸数据吗？此操作不可恢复！(y/N): ")
+        if response.lower() != 'y':
+            print("已取消操作")
+            return
+
+    try:
+        db = Database(db_path)
+        with db.get_connection() as conn:
+            cursor = conn.execute("DELETE FROM faces")
+            deleted = cursor.rowcount
+            conn.commit()
+
+        print(f"\n已删除 {deleted} 条人脸记录")
+        print("人脸数据已清空，可以重新运行分析来识别人脸")
+    except Exception as e:
+        print(f"错误：{e}")
+
+
+def clear_vl_analysis(db_path: str = None, confirm: bool = False):
+    """
+    清空所有 VL 分析数据（OCR、图片分类等）
+
+    Args:
+        db_path: 数据库路径
+        confirm: 是否需要确认
+    """
+    db_path = db_path or str(DATABASE_PATH)
+
+    print_separator("清空 VL 分析数据")
+    print(f"数据库路径：{db_path}")
+
+    if not confirm:
+        response = input("\n确定要清空所有 VL 分析数据吗？此操作不可恢复！(y/N): ")
+        if response.lower() != 'y':
+            print("已取消操作")
+            return
+
+    try:
+        db = Database(db_path)
+        with db.get_connection() as conn:
+            cursor = conn.execute("DELETE FROM vl_analysis")
+            deleted = cursor.rowcount
+            conn.commit()
+
+        print(f"\n已删除 {deleted} 条 VL 分析记录")
+        print("VL 分析数据已清空，可以重新运行分析来进行 OCR 和图片理解")
+    except Exception as e:
+        print(f"错误：{e}")
+
+
+def clear_all_data(db_path: str = None, confirm: bool = False):
+    """
+    清空所有数据（恢复到初始状态）
+
+    Args:
+        db_path: 数据库路径
+        confirm: 是否需要确认
+    """
+    db_path = db_path or str(DATABASE_PATH)
+
+    print_separator("清空所有数据")
+    print(f"数据库路径：{db_path}")
+    print("\n警告：这将删除所有图片记录、人脸数据、VL 分析结果和 EXIF 信息！")
+
+    if not confirm:
+        response = input("\n确定要清空所有数据吗？此操作不可恢复！(y/N): ")
+        if response.lower() != 'y':
+            print("已取消操作")
+            return
+
+    try:
+        db = Database(db_path)
+        with db.get_connection() as conn:
+            # 按顺序删除（注意外键约束）
+            conn.execute("DELETE FROM vl_analysis")
+            conn.execute("DELETE FROM faces")
+            conn.execute("DELETE FROM exif_data")
+            conn.execute("DELETE FROM duplicates")
+            conn.execute("DELETE FROM images")
+            conn.commit()
+
+        print("\n所有数据已清空")
+        print("请重新运行扫描和分析命令：")
+        print("  python -m photo_analyzer.main scan")
+        print("  python -m photo_analyzer.main analyze")
+    except Exception as e:
+        print(f"错误：{e}")
+
+
 def main():
     """命令行入口"""
     import argparse
@@ -182,9 +285,29 @@ def main():
     parser.add_argument("--limit", type=int, default=10,
                         help="要检查的图片数量（默认 10）")
 
+    # 清空数据选项
+    clear_group = parser.add_argument_group("清空数据选项")
+    clear_group.add_argument("--clear-all", action="store_true",
+                             help="清空所有数据（图片记录、人脸、VL 分析、EXIF）")
+    clear_group.add_argument("--clear-faces", action="store_true",
+                             help="清空所有人脸数据")
+    clear_group.add_argument("--clear-vl", action="store_true",
+                             help="清空所有 VL 分析数据（OCR、分类等）")
+    clear_group.add_argument("-y", "--yes", action="store_true",
+                             help="确认操作，不询问")
+
     args = parser.parse_args()
 
-    check_database(db_path=args.db, limit=args.limit)
+    # 处理清空操作
+    if args.clear_all:
+        clear_all_data(db_path=args.db, confirm=args.yes)
+    elif args.clear_faces:
+        clear_faces(db_path=args.db, confirm=args.yes)
+    elif args.clear_vl:
+        clear_vl_analysis(db_path=args.db, confirm=args.yes)
+    else:
+        # 默认检查数据库
+        check_database(db_path=args.db, limit=args.limit)
 
 
 if __name__ == "__main__":
