@@ -176,61 +176,61 @@ class VLAnalyzer:
         return results
 
     def _process_batch(self, image_paths: List[str]) -> List[Optional[Dict[str, Any]]]:
-        """处理一个 batch 的图片"""
-        results = []
+        """
+        处理一个 batch 的图片 - 使用 vLLM 批量并行推理
+
+        vLLM 0.16.0 的 llm.chat() 支持传入列表批量处理，
+        可以一次性并行处理多个请求，比逐个调用更高效。
+        """
+        results = [None] * len(image_paths)
 
         try:
             # 为每个图片构建消息
             messages_list = []
-            for image_path in image_paths:
+            valid_indices = []
+
+            for idx, image_path in enumerate(image_paths):
                 try:
                     image_base64 = self._encode_image_to_base64(image_path)
-                    messages = [
-                        {
-                            "role": "user",
-                            "content": [
-                                {"type": "text", "text": self.ANALYSIS_PROMPT},
-                                {
-                                    "type": "image_url",
-                                    "image_url": {
-                                        "url": f"data:image/jpeg;base64,{image_base64}"
-                                    },
+                    messages = {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": self.ANALYSIS_PROMPT},
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/jpeg;base64,{image_base64}"
                                 },
-                            ],
-                        }
-                    ]
+                            },
+                        ],
+                    }
                     messages_list.append(messages)
+                    valid_indices.append(idx)
                 except Exception as e:
                     print(f"Error preparing {image_path}: {e}")
-                    results.append(None)
 
             if not messages_list:
                 return results
 
-            # 批量推理
-            # vLLM 0.16.0 支持 batch chat
-            all_outputs = []
-            for messages in messages_list:
-                try:
-                    outputs = self.llm.chat(messages, sampling_params=self.sampling_params)
-                    all_outputs.append(outputs)
-                except Exception as e:
-                    print(f"Error in inference: {e}")
-                    all_outputs.append(None)
+            # 批量推理 - vLLM 0.16.0 支持传入列表一次性处理多个请求
+            # llm.chat() 可以直接传入 List[Dict] 批量处理
+            outputs = self.llm.chat(
+                messages=messages_list,
+                sampling_params=self.sampling_params,
+                use_tqdm=False
+            )
 
-            # 解析结果
-            for i, outputs in enumerate(all_outputs):
-                if outputs and len(outputs) > 0:
-                    content = outputs[0].outputs[0].text
-                    results.append(self._parse_response(content))
-                else:
-                    results.append(None)
+            # 解析结果并映射回原始索引
+            for i, output in enumerate(outputs):
+                try:
+                    original_idx = valid_indices[i]
+                    content = output.outputs[0].text
+                    results[original_idx] = self._parse_response(content)
+                except Exception as e:
+                    print(f"Error parsing result {i}: {e}")
 
         except Exception as e:
             print(f"Error processing batch: {e}")
-            # 返回部分结果
-            while len(results) < len(image_paths):
-                results.append(None)
 
         return results
 
