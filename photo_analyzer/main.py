@@ -188,6 +188,177 @@ class PhotoAnalyzer:
         """获取当前状态"""
         return self.scanner.get_status()
 
+    def refresh_faces(self, limit: int = None, batch_size: int = None) -> dict:
+        """
+        强制重新刷新所有图片的人脸信息（保留 VL 分析内容不变）
+
+        Args:
+            limit: 限制处理的图片数量
+            batch_size: 批处理大小
+
+        Returns:
+            dict: 处理统计信息
+        """
+        print("=" * 50)
+        print("Refreshing face recognition for all images...")
+        print("(VL analysis data will be preserved)")
+        print("=" * 50)
+
+        batch_size = batch_size or self.vl_analyzer.batch_size
+
+        # 获取所有已处理的图片
+        all_images = self.db.get_all_images(limit=limit)
+
+        if not all_images:
+            print("No images found in database!")
+            return {"total": 0, "success": 0, "failed": 0, "updated": 0}
+
+        print(f"Found {len(all_images)} images to process")
+
+        # 批量处理
+        stats = {"total": len(all_images), "success": 0, "failed": 0, "updated": 0}
+
+        for i in range(0, len(all_images), batch_size):
+            batch = all_images[i:i + batch_size]
+            batch_num = (i // batch_size) + 1
+            total_batches = (len(all_images) + batch_size - 1) // batch_size
+
+            print(f"\n--- Batch {batch_num}/{total_batches} ---")
+
+            for image in batch:
+                image_path = image['file_path']
+                image_id = image['id']
+
+                try:
+                    # 删除旧的人脸数据
+                    with self.db.get_connection() as conn:
+                        conn.execute("DELETE FROM faces WHERE image_id = ?", (image_id,))
+                        conn.commit()
+
+                    # 重新识别人脸
+                    faces = self.face_recognizer.recognize_faces(image_path)
+
+                    # 保存新的人脸数据
+                    for face in faces:
+                        if face.get('face_encoding'):
+                            self.db.add_face(
+                                image_id=image_id,
+                                person_name=face.get('person_name', '未知'),
+                                face_encoding=face.get('face_encoding'),
+                                bbox=face.get('bbox', (0, 0, 0, 0)),
+                                confidence=face.get('confidence'),
+                            )
+                            stats["updated"] += 1
+
+                    stats["success"] += 1
+
+                except Exception as e:
+                    print(f"Error processing {image_path}: {e}")
+                    stats["failed"] += 1
+
+            print(f"Progress: {min(i + batch_size, len(all_images))}/{len(all_images)} images")
+
+        # 打印总结
+        print("\n" + "=" * 50)
+        print("Face Refresh Complete!")
+        print("=" * 50)
+        print(f"  Total: {stats['total']}")
+        print(f"  Success: {stats['success']}")
+        print(f"  Failed: {stats['failed']}")
+        print(f"  Face records updated: {stats['updated']}")
+
+        # 显示家庭成员统计
+        persons = self.db.get_all_persons()
+        print(f"\nRegistered persons: {len(persons)}")
+        for name in persons:
+            images_with_person = self.db.get_images_by_person(name)
+            print(f"  - {name}: {len(images_with_person)} photos")
+
+        return stats
+
+    def refresh_vl_analysis(self, limit: int = None, batch_size: int = None) -> dict:
+        """
+        强制重新刷新所有图片的 VL 分析信息（保留人脸信息不变）
+
+        Args:
+            limit: 限制处理的图片数量
+            batch_size: 批处理大小
+
+        Returns:
+            dict: 处理统计信息
+        """
+        print("=" * 50)
+        print("Refreshing VL analysis for all images...")
+        print("(Face recognition data will be preserved)")
+        print("=" * 50)
+
+        batch_size = batch_size or self.vl_analyzer.batch_size
+
+        # 获取所有已处理的图片
+        all_images = self.db.get_all_images(limit=limit)
+
+        if not all_images:
+            print("No images found in database!")
+            return {"total": 0, "success": 0, "failed": 0, "updated": 0}
+
+        print(f"Found {len(all_images)} images to process")
+        print(f"Batch size: {batch_size}")
+
+        # 批量处理
+        stats = {"total": len(all_images), "success": 0, "failed": 0, "updated": 0}
+
+        for i in range(0, len(all_images), batch_size):
+            batch = all_images[i:i + batch_size]
+            batch_num = (i // batch_size) + 1
+            total_batches = (len(all_images) + batch_size - 1) // batch_size
+
+            print(f"\n--- Batch {batch_num}/{total_batches} ---")
+
+            for image in batch:
+                image_path = image['file_path']
+                image_id = image['id']
+
+                try:
+                    # 删除旧的 VL 分析数据
+                    with self.db.get_connection() as conn:
+                        conn.execute("DELETE FROM vl_analysis WHERE image_id = ?", (image_id,))
+                        conn.commit()
+
+                    # 重新进行 VL 分析
+                    vl_result = self.vl_analyzer.analyze_image(image_path)
+
+                    # 保存新的 VL 分析数据
+                    if vl_result:
+                        self.db.add_vl_analysis(
+                            image_id=image_id,
+                            ocr_text=vl_result.get('ocr_text'),
+                            scene_description=vl_result.get('scene_description'),
+                            category=vl_result.get('category'),
+                            objects=vl_result.get('objects'),
+                            mood=vl_result.get('mood'),
+                            confidence=vl_result.get('confidence'),
+                        )
+                        stats["updated"] += 1
+
+                    stats["success"] += 1
+
+                except Exception as e:
+                    print(f"Error processing {image_path}: {e}")
+                    stats["failed"] += 1
+
+            print(f"Progress: {min(i + batch_size, len(all_images))}/{len(all_images)} images")
+
+        # 打印总结
+        print("\n" + "=" * 50)
+        print("VL Analysis Refresh Complete!")
+        print("=" * 50)
+        print(f"  Total: {stats['total']}")
+        print(f"  Success: {stats['success']}")
+        print(f"  Failed: {stats['failed']}")
+        print(f"  VL records updated: {stats['updated']}")
+
+        return stats
+
     def close(self):
         """清理资源"""
         self.vl_analyzer.close()
@@ -196,7 +367,7 @@ class PhotoAnalyzer:
 def main():
     """命令行入口"""
     parser = argparse.ArgumentParser(description="AutoAlbum Photo Analyzer")
-    parser.add_argument("command", choices=["scan", "analyze", "register", "status"],
+    parser.add_argument("command", choices=["scan", "analyze", "register", "status", "refresh-faces", "refresh-vl"],
                         help="Command to run")
     parser.add_argument("--db", type=str, help="Database path")
     parser.add_argument("--batch-size", type=int, default=4,
@@ -232,6 +403,14 @@ def main():
             print("-" * 30)
             for key, value in status.items():
                 print(f"  {key}: {value}")
+
+        elif args.command == "refresh-faces":
+            # 强制重新刷新人脸信息
+            analyzer.refresh_faces(limit=args.limit, batch_size=args.batch_size)
+
+        elif args.command == "refresh-vl":
+            # 强制重新刷新 VL 分析信息
+            analyzer.refresh_vl_analysis(limit=args.limit, batch_size=args.batch_size)
 
     finally:
         analyzer.close()
