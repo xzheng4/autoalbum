@@ -52,8 +52,9 @@ class PhotoAnalyzer:
 
         print(f"  Total files on disk: {status['total_files_on_disk']}")
         print(f"  Total in database: {status['total_in_database']}")
-        print(f"  Processed: {status['processed']}")
-        print(f"  Unprocessed: {status['unprocessed']}")
+        print(f"  EXIF processed: {status['exif_processed']}")
+        print(f"  Face processed: {status['face_processed']}")
+        print(f"  VL processed: {status['vl_processed']}")
         print(f"  Not in database: {status['not_in_database']}")
 
         return status
