@@ -28,18 +28,21 @@ class PhotoAnalyzer:
         self.duplicate_detector = DuplicateDetector()
 
     def register_faces_from_directory(self) -> dict:
-        """从 faces 目录注册家庭成员人脸"""
+        """从 faces 目录刷新家庭成员人脸"""
         print("=" * 50)
-        print("Registering family members from faces directory...")
+        print("Refreshing known faces from data/faces/ directory...")
         print("=" * 50)
 
-        results = self.face_recognizer.scan_faces_directory()
+        # FaceRecognizer 会在初始化时自动刷新
+        # 这里重新创建实例以强制刷新
+        self.face_recognizer = FaceRecognizer()
 
-        for name, success in results.items():
-            status = "✓" if success else "✗"
-            print(f"  {status} {name}")
+        persons = self.face_recognizer.get_registered_persons()
+        print(f"\nRegistered persons: {len(persons)}")
+        for name in persons:
+            print(f"  - {name}")
 
-        return results
+        return {name: True for name in persons}
 
     def analyze_image(self, image_path: str) -> bool:
         """
