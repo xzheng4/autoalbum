@@ -2,11 +2,9 @@
 AutoAlbum 照片分析主入口
 """
 import argparse
-import sys
-from pathlib import Path
 from tqdm import tqdm
 
-from .config import DATABASE_PATH, ANALYZER_CONFIG, PHOTOS_DIR
+from .config import DATABASE_PATH, PHOTOS_DIR
 from .database import Database
 from .scanner import ImageScanner
 from .exif_extractor import EXIFExtractor
@@ -35,7 +33,6 @@ class PhotoAnalyzer:
         print("=" * 50)
 
         # FaceRecognizer 会在初始化时自动刷新
-        # 这里重新创建实例以强制刷新
         self.face_recognizer = FaceRecognizer()
 
         persons = self.face_recognizer.get_registered_persons()
@@ -44,128 +41,6 @@ class PhotoAnalyzer:
             print(f"  - {name}")
 
         return {name: True for name in persons}
-
-    def analyze_image(self, image_path: str) -> bool:
-        """
-        分析单张图片
-
-        Args:
-            image_path: 图片路径
-
-        Returns:
-            bool: 是否分析成功
-        """
-        try:
-            # 1. 提取 EXIF 信息
-            exif_data = self.exif_extractor.extract_exif(image_path)
-
-            # 2. 更新数据库中的图片信息
-            image_id = self.db.add_image(
-                file_path=image_path,
-                file_hash=exif_data.get('file_hash') or self.exif_extractor.get_file_hash(image_path),
-                file_size=exif_data.get('file_size') or self.exif_extractor.get_file_size(image_path),
-                width=exif_data.get('width'),
-                height=exif_data.get('height'),
-                format=exif_data.get('format'),
-                captured_at=exif_data.get('captured_at'),
-            )
-
-            # 3. 保存 EXIF 数据
-            self.db.add_exif_data(image_id, **exif_data)
-
-            # 4. 人脸识别
-            faces = self.face_recognizer.recognize_faces(image_path)
-            for face in faces:
-                if face.get('face_embedding'):
-                    self.db.add_face(
-                        image_id=image_id,
-                        person_name=face.get('person_name', '未知'),
-                        face_encoding=face.get('face_embedding'),
-                        bbox=face.get('bbox', (0, 0, 0, 0)),
-                        confidence=face.get('confidence'),
-                    )
-
-            # 5. VL 分析（OCR + 图片理解）
-            vl_result = self.vl_analyzer.analyze_image(image_path)
-            if vl_result:
-                self.db.add_vl_analysis(
-                    image_id=image_id,
-                    ocr_text=vl_result.get('ocr_text'),
-                    scene_description=vl_result.get('scene_description'),
-                    category=vl_result.get('category'),
-                    objects=vl_result.get('objects'),
-                    mood=vl_result.get('mood'),
-                    confidence=vl_result.get('confidence'),
-                )
-
-            # 6. 计算感知哈希（用于重复检测）
-            phash = self.duplicate_detector.get_image_hash(image_path)
-
-            # 7. 标记为已处理
-            self.db.mark_processed(image_id)
-
-            return True
-
-        except Exception as e:
-            print(f"Error analyzing {image_path}: {e}")
-            return False
-
-    def analyze_all(self, limit: int = None, skip_existing: bool = True) -> dict:
-        """
-        分析所有未处理的图片
-
-        Args:
-            limit: 限制分析的图片数量（用于测试）
-            skip_existing: 跳过已处理的图片
-
-        Returns:
-            dict: 分析统计信息
-        """
-        print("=" * 50)
-        print("Starting photo analysis...")
-        print("=" * 50)
-        print(f"Batch size: {self.vl_analyzer.batch_size}")
-
-        # 获取未处理的图片
-        unprocessed = self.scanner.get_unprocessed_images()
-
-        if limit:
-            unprocessed = unprocessed[:limit]
-
-        if not unprocessed:
-            print("No unprocessed images found!")
-            return {"total": 0, "success": 0, "failed": 0}
-
-        print(f"Found {len(unprocessed)} images to process")
-
-        # 批量分析
-        stats = {"total": len(unprocessed), "success": 0, "failed": 0}
-
-        # 按 batch_size 分组处理
-        batch_size = self.vl_analyzer.batch_size
-        batches = [unprocessed[i:i + batch_size] for i in range(0, len(unprocessed), batch_size)]
-
-        for batch_num, batch in enumerate(tqdm(batches, desc="Analyzing batches"), 1):
-            total_batches = len(batches)
-
-            print(f"\n--- Batch {batch_num}/{total_batches} ---")
-
-            for image_path in tqdm(batch, desc=f"Processing images"):
-                success = self.analyze_image(image_path)
-                if success:
-                    stats["success"] += 1
-                else:
-                    stats["failed"] += 1
-
-        # 打印总结
-        print("\n" + "=" * 50)
-        print("Analysis Complete!")
-        print("=" * 50)
-        print(f"  Total: {stats['total']}")
-        print(f"  Success: {stats['success']}")
-        print(f"  Failed: {stats['failed']}")
-
-        return stats
 
     def scan(self) -> dict:
         """扫描图片目录，添加新图片到数据库"""
@@ -187,6 +62,72 @@ class PhotoAnalyzer:
         """获取当前状态"""
         return self.scanner.get_status()
 
+    def refresh_exif(self, limit: int = None) -> dict:
+        """
+        强制重新刷新所有图片的 EXIF 信息
+
+        Args:
+            limit: 限制处理的图片数量
+
+        Returns:
+            dict: 处理统计信息
+        """
+        print("=" * 50)
+        print("Refreshing EXIF data for all images...")
+        print("=" * 50)
+
+        # 获取所有已处理的图片
+        all_images = self.db.get_all_images(limit=limit)
+
+        if not all_images:
+            print("No images found in database!")
+            return {"total": 0, "success": 0, "failed": 0, "updated": 0}
+
+        print(f"Found {len(all_images)} images to process")
+
+        # 批量处理
+        stats = {"total": len(all_images), "success": 0, "failed": 0, "updated": 0}
+
+        for image in tqdm(all_images, desc="Refreshing EXIF"):
+            image_path = image['file_path']
+            image_id = image['id']
+
+            try:
+                # 提取 EXIF 信息
+                exif_data = self.exif_extractor.extract_exif(image_path)
+
+                # 更新图片基本信息
+                self.db.add_image(
+                    file_path=image_path,
+                    file_hash=exif_data.get('file_hash') or self.exif_extractor.get_file_hash(image_path),
+                    file_size=exif_data.get('file_size') or self.exif_extractor.get_file_size(image_path),
+                    width=exif_data.get('width'),
+                    height=exif_data.get('height'),
+                    format=exif_data.get('format'),
+                    captured_at=exif_data.get('captured_at'),
+                )
+
+                # 更新 EXIF 数据
+                self.db.add_exif_data(image_id, **exif_data)
+
+                stats["success"] += 1
+                stats["updated"] += 1
+
+            except Exception as e:
+                print(f"Error processing {image_path}: {e}")
+                stats["failed"] += 1
+
+        # 打印总结
+        print("\n" + "=" * 50)
+        print("EXIF Refresh Complete!")
+        print("=" * 50)
+        print(f"  Total: {stats['total']}")
+        print(f"  Success: {stats['success']}")
+        print(f"  Failed: {stats['failed']}")
+        print(f"  EXIF records updated: {stats['updated']}")
+
+        return stats
+
     def refresh_faces(self, limit: int = None, batch_size: int = None) -> dict:
         """
         强制重新刷新所有图片的人脸信息（保留 VL 分析内容不变）
@@ -200,7 +141,7 @@ class PhotoAnalyzer:
         """
         print("=" * 50)
         print("Refreshing face recognition for all images...")
-        print("(VL analysis data will be preserved)")
+        print("(EXIF and VL analysis data will be preserved)")
         print("=" * 50)
 
         batch_size = batch_size or self.vl_analyzer.batch_size
@@ -217,7 +158,6 @@ class PhotoAnalyzer:
         # 批量处理
         stats = {"total": len(all_images), "success": 0, "failed": 0, "updated": 0}
 
-        batch_size = batch_size or self.vl_analyzer.batch_size
         batches = [all_images[i:i + batch_size] for i in range(0, len(all_images), batch_size)]
 
         for batch_num, batch in enumerate(tqdm(batches, desc="Refreshing faces"), 1):
@@ -287,7 +227,7 @@ class PhotoAnalyzer:
         """
         print("=" * 50)
         print("Refreshing VL analysis for all images...")
-        print("(Face recognition data will be preserved)")
+        print("(EXIF and Face recognition data will be preserved)")
         print("=" * 50)
 
         batch_size = batch_size or self.vl_analyzer.batch_size
@@ -305,7 +245,6 @@ class PhotoAnalyzer:
         # 批量处理
         stats = {"total": len(all_images), "success": 0, "failed": 0, "updated": 0}
 
-        batch_size = batch_size or self.vl_analyzer.batch_size
         batches = [all_images[i:i + batch_size] for i in range(0, len(all_images), batch_size)]
 
         for batch_num, batch in enumerate(tqdm(batches, desc="Refreshing VL analysis"), 1):
@@ -356,6 +295,41 @@ class PhotoAnalyzer:
 
         return stats
 
+    def analyze_all(self, limit: int = None) -> dict:
+        """
+        分析所有图片：依次执行 refresh-exif, refresh-faces, refresh-vl
+
+        Args:
+            limit: 限制处理的图片数量
+
+        Returns:
+            dict: 分析统计信息
+        """
+        print("=" * 50)
+        print("Starting full photo analysis pipeline...")
+        print("=" * 50)
+        print(f"Batch size: {self.vl_analyzer.batch_size}")
+        print()
+
+        # 1. 刷新 EXIF
+        print("\n>>> Step 1/3: Refreshing EXIF data...")
+        self.refresh_exif(limit=limit)
+
+        # 2. 刷新人脸
+        print("\n>>> Step 2/3: Refreshing face recognition...")
+        self.refresh_faces(limit=limit)
+
+        # 3. 刷新 VL 分析
+        print("\n>>> Step 3/3: Refreshing VL analysis...")
+        self.refresh_vl_analysis(limit=limit)
+
+        # 打印总结
+        print("\n" + "=" * 50)
+        print("Full Analysis Pipeline Complete!")
+        print("=" * 50)
+
+        return {"status": "complete"}
+
     def close(self):
         """清理资源"""
         self.vl_analyzer.close()
@@ -364,7 +338,8 @@ class PhotoAnalyzer:
 def main():
     """命令行入口"""
     parser = argparse.ArgumentParser(description="AutoAlbum Photo Analyzer")
-    parser.add_argument("command", choices=["scan", "analyze", "register", "status", "refresh-faces", "refresh-vl"],
+    parser.add_argument("command",
+                        choices=["scan", "analyze", "register", "status", "refresh-exif", "refresh-faces", "refresh-vl"],
                         help="Command to run")
     parser.add_argument("--db", type=str, help="Database path")
     parser.add_argument("--batch-size", type=int, default=4,
@@ -389,7 +364,7 @@ def main():
         elif args.command == "analyze":
             # 先扫描添加新图片
             analyzer.scan()
-            # 然后分析
+            # 然后执行完整分析流程
             analyzer.analyze_all(limit=args.limit)
 
         elif args.command == "register":
@@ -401,6 +376,10 @@ def main():
             print("-" * 30)
             for key, value in status.items():
                 print(f"  {key}: {value}")
+
+        elif args.command == "refresh-exif":
+            # 强制重新刷新 EXIF 信息
+            analyzer.refresh_exif(limit=args.limit)
 
         elif args.command == "refresh-faces":
             # 强制重新刷新人脸信息

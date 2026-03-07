@@ -72,6 +72,27 @@ refresh-faces 以后显示 Face records updated: 0，人脸信息没有本顺利
 ### 指令 14: 更新 README
 更新 README.md 文档，添加新功能说明和工具使用文档
 
+### 指令 15: 修复 --photos-dir 参数
+--photos-dir 参数不起作用。修复了参数传递问题，使其能正确指定照片目录。
+
+### 指令 16: 添加进度条
+- 为 scanner.py 的 add_new_images_to_db 函数添加 tqdm 进度条
+- 为 main.py 的 analyze_all、refresh_faces、refresh_vl_analysis 函数添加 tqdm 进度条
+
+### 指令 17: 重构分析流程
+将 analyze_image 拆分成三个独立阶段：
+1. EXIF 处理 - 提取并更新图片 EXIF 信息
+2. 人脸识别 - 识别人脸并登记到数据库
+3. VL 图片理解与分析 - 使用 Qwen3-VL 进行图片内容理解
+
+新增 refresh-exif 命令，修改 analyze 命令流程：
+1. scan: 扫描所有图片并登记到数据库
+2. refresh-exif: 更新所有图片的 EXIF 信息
+3. refresh-faces: 更新所有图片的人脸信息
+4. refresh-vl: 更新所有图片的 VL 分析信息
+
+所有处理过程都带有 tqdm 进度条。
+
 ---
 
 ## 项目实现状态
@@ -88,8 +109,9 @@ refresh-faces 以后显示 Face records updated: 0，人脸信息没有本顺利
 - [x] 推送到远程仓库
 - [x] .gitignore 排除 data/ 目录
 - [x] tools/check_db.py 数据库检查工具
-- [x] refresh-faces 和 refresh-vl 命令
+- [x] refresh-exif、refresh-faces 和 refresh-vl 命令
 - [x] 修复 face_encoding/face_embedding key 名称不匹配 bug
+- [x] 重构分析流程为三阶段独立处理
 
 ---
 

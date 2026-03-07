@@ -88,6 +88,9 @@ python -m photo_analyzer.main analyze --batch-size 4
 # 限制处理数量（测试用）
 python -m photo_analyzer.main analyze --limit 100
 
+# 刷新 EXIF 信息
+python -m photo_analyzer.main refresh-exif
+
 # 刷新人脸信息（保留 VL 分析）
 python -m photo_analyzer.main refresh-faces
 
