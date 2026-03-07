@@ -44,7 +44,7 @@ Output ONLY a valid JSON object with this exact structure:
 
     def __init__(self, batch_size: int = None):
         self.batch_size = batch_size or ANALYZER_CONFIG.get("batch_size", 4)
-        self.model_name = VLLM_CONFIG.get("model_name", "Qwen/Qwen3-VL-4B-Instruct")
+        self.model_name = VLLM_CONFIG.get("model_name", "Qwen/Qwen3-VL-4B-Instruct-FP8")
         self.llm = None
         self._initialized = False
 

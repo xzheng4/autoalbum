@@ -123,6 +123,7 @@ class PhotoAnalyzer:
         print("=" * 50)
         print("Starting photo analysis...")
         print("=" * 50)
+        print(f"Batch size: {self.vl_analyzer.batch_size}")
 
         # 获取未处理的图片
         unprocessed = self.scanner.get_unprocessed_images()
@@ -139,12 +140,23 @@ class PhotoAnalyzer:
         # 批量分析
         stats = {"total": len(unprocessed), "success": 0, "failed": 0}
 
-        for image_path in tqdm(unprocessed, desc="Analyzing photos"):
-            success = self.analyze_image(image_path)
-            if success:
-                stats["success"] += 1
-            else:
-                stats["failed"] += 1
+        # 按 batch_size 分组处理
+        batch_size = self.vl_analyzer.batch_size
+        for i in range(0, len(unprocessed), batch_size):
+            batch = unprocessed[i:i + batch_size]
+            batch_num = (i // batch_size) + 1
+            total_batches = (len(unprocessed) + batch_size - 1) // batch_size
+
+            print(f"\n--- Batch {batch_num}/{total_batches} ---")
+
+            for image_path in batch:
+                success = self.analyze_image(image_path)
+                if success:
+                    stats["success"] += 1
+                else:
+                    stats["failed"] += 1
+
+            print(f"Progress: {min(i + batch_size, len(unprocessed))}/{len(unprocessed)} images")
 
         # 打印总结
         print("\n" + "=" * 50)
