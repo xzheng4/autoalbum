@@ -160,12 +160,8 @@ class PhotoAnalyzer:
 
         batches = [all_images[i:i + batch_size] for i in range(0, len(all_images), batch_size)]
 
-        for batch_num, batch in enumerate(tqdm(batches, desc="Refreshing faces"), 1):
-            total_batches = len(batches)
-
-            print(f"\n--- Batch {batch_num}/{total_batches} ---")
-
-            for image in tqdm(batch, desc=f"Processing images"):
+        for batch in tqdm(batches, desc="Refreshing faces"):
+            for image in batch:
                 image_path = image['file_path']
                 image_id = image['id']
 
