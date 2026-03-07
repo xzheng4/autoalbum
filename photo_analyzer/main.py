@@ -62,30 +62,37 @@ class PhotoAnalyzer:
         """获取当前状态"""
         return self.scanner.get_status()
 
-    def refresh_exif(self, limit: int = None) -> dict:
+    def refresh_exif(self, limit: int = None, force: bool = False) -> dict:
         """
-        强制重新刷新所有图片的 EXIF 信息
+        刷新所有图片的 EXIF 信息
 
         Args:
             limit: 限制处理的图片数量
+            force: 是否强制刷新（跳过已处理的图片）
 
         Returns:
             dict: 处理统计信息
         """
         print("=" * 50)
-        print("Refreshing EXIF data for all images...")
+        if force:
+            print("Forcibly refreshing EXIF data for all images...")
+        else:
+            print("Refreshing EXIF data for unprocessed images...")
         print("=" * 50)
 
-        # 获取所有已处理的图片
-        all_images = self.db.get_all_images(limit=limit)
+        # 获取需要处理的图片
+        if force:
+            all_images = self.db.get_all_images(limit=limit)
+        else:
+            all_images = self.db.get_unprocessed_exif_images(limit=limit)
 
         if not all_images:
-            print("No images found in database!")
+            print("No images to process!")
             return {"total": 0, "success": 0, "failed": 0, "updated": 0}
 
         print(f"Found {len(all_images)} images to process")
 
-        # 批量处理
+        # 处理
         stats = {"total": len(all_images), "success": 0, "failed": 0, "updated": 0}
 
         for image in tqdm(all_images, desc="Refreshing EXIF"):
@@ -110,6 +117,9 @@ class PhotoAnalyzer:
                 # 更新 EXIF 数据
                 self.db.add_exif_data(image_id, **exif_data)
 
+                # 标记为已处理
+                self.db.mark_exif_processed(image_id)
+
                 stats["success"] += 1
                 stats["updated"] += 1
 
@@ -128,29 +138,36 @@ class PhotoAnalyzer:
 
         return stats
 
-    def refresh_faces(self, limit: int = None, batch_size: int = None) -> dict:
+    def refresh_faces(self, limit: int = None, batch_size: int = None, force: bool = False) -> dict:
         """
-        强制重新刷新所有图片的人脸信息（保留 VL 分析内容不变）
+        刷新所有图片的人脸信息
 
         Args:
             limit: 限制处理的图片数量
             batch_size: 批处理大小
+            force: 是否强制刷新（跳过已处理的图片）
 
         Returns:
             dict: 处理统计信息
         """
         print("=" * 50)
-        print("Refreshing face recognition for all images...")
+        if force:
+            print("Forcibly refreshing face recognition for all images...")
+        else:
+            print("Refreshing face recognition for unprocessed images...")
         print("(EXIF and VL analysis data will be preserved)")
         print("=" * 50)
 
         batch_size = batch_size or self.vl_analyzer.batch_size
 
-        # 获取所有已处理的图片
-        all_images = self.db.get_all_images(limit=limit)
+        # 获取需要处理的图片
+        if force:
+            all_images = self.db.get_all_images(limit=limit)
+        else:
+            all_images = self.db.get_unprocessed_face_images(limit=limit)
 
         if not all_images:
-            print("No images found in database!")
+            print("No images to process!")
             return {"total": 0, "success": 0, "failed": 0, "updated": 0}
 
         print(f"Found {len(all_images)} images to process")
@@ -186,6 +203,9 @@ class PhotoAnalyzer:
                             )
                             stats["updated"] += 1
 
+                    # 标记为已处理
+                    self.db.mark_face_processed(image_id)
+
                     stats["success"] += 1
 
                 except Exception as e:
@@ -210,29 +230,36 @@ class PhotoAnalyzer:
 
         return stats
 
-    def refresh_vl_analysis(self, limit: int = None, batch_size: int = None) -> dict:
+    def refresh_vl_analysis(self, limit: int = None, batch_size: int = None, force: bool = False) -> dict:
         """
-        强制重新刷新所有图片的 VL 分析信息（保留人脸信息不变）
+        刷新所有图片的 VL 分析信息
 
         Args:
             limit: 限制处理的图片数量
             batch_size: 批处理大小
+            force: 是否强制刷新（跳过已处理的图片）
 
         Returns:
             dict: 处理统计信息
         """
         print("=" * 50)
-        print("Refreshing VL analysis for all images...")
+        if force:
+            print("Forcibly refreshing VL analysis for all images...")
+        else:
+            print("Refreshing VL analysis for unprocessed images...")
         print("(EXIF and Face recognition data will be preserved)")
         print("=" * 50)
 
         batch_size = batch_size or self.vl_analyzer.batch_size
 
-        # 获取所有已处理的图片
-        all_images = self.db.get_all_images(limit=limit)
+        # 获取需要处理的图片
+        if force:
+            all_images = self.db.get_all_images(limit=limit)
+        else:
+            all_images = self.db.get_unprocessed_vl_images(limit=limit)
 
         if not all_images:
-            print("No images found in database!")
+            print("No images to process!")
             return {"total": 0, "success": 0, "failed": 0, "updated": 0}
 
         print(f"Found {len(all_images)} images to process")
@@ -271,6 +298,9 @@ class PhotoAnalyzer:
                         )
                         stats["updated"] += 1
 
+                    # 标记为已处理
+                    self.db.mark_vl_processed(image_id)
+
                     stats["success"] += 1
 
                 except Exception as e:
@@ -290,7 +320,8 @@ class PhotoAnalyzer:
 
     def analyze_all(self, limit: int = None) -> dict:
         """
-        分析所有图片：依次执行 refresh-exif, refresh-faces, refresh-vl
+        分析所有未处理的图片：依次执行 EXIF 提取、人脸识别、VL 分析
+        支持断点续传，跳过已完成处理的阶段
 
         Args:
             limit: 限制处理的图片数量
@@ -299,29 +330,36 @@ class PhotoAnalyzer:
             dict: 分析统计信息
         """
         print("=" * 50)
-        print("Starting full photo analysis pipeline...")
+        print("Starting photo analysis pipeline...")
         print("=" * 50)
         print(f"Batch size: {self.vl_analyzer.batch_size}")
-        print()
 
-        # 1. 刷新 EXIF
-        print("\n>>> Step 1/3: Refreshing EXIF data...")
-        self.refresh_exif(limit=limit)
+        total_stats = {"exif": 0, "face": 0, "vl": 0}
 
-        # 2. 刷新人脸
-        print("\n>>> Step 2/3: Refreshing face recognition...")
-        self.refresh_faces(limit=limit)
+        # 1. 处理 EXIF（只处理未完成的）
+        print("\n>>> Step 1/3: Processing EXIF data...")
+        exif_stats = self.refresh_exif(limit=limit, force=False)
+        total_stats["exif"] = exif_stats["success"]
 
-        # 3. 刷新 VL 分析
-        print("\n>>> Step 3/3: Refreshing VL analysis...")
-        self.refresh_vl_analysis(limit=limit)
+        # 2. 处理人脸（只处理未完成的）
+        print("\n>>> Step 2/3: Processing face recognition...")
+        face_stats = self.refresh_faces(limit=limit, force=False)
+        total_stats["face"] = face_stats["success"]
+
+        # 3. 处理 VL 分析（只处理未完成的）
+        print("\n>>> Step 3/3: Processing VL analysis...")
+        vl_stats = self.refresh_vl_analysis(limit=limit, force=False)
+        total_stats["vl"] = vl_stats["success"]
 
         # 打印总结
         print("\n" + "=" * 50)
-        print("Full Analysis Pipeline Complete!")
+        print("Analysis Pipeline Complete!")
         print("=" * 50)
+        print(f"  EXIF processed: {total_stats['exif']}")
+        print(f"  Faces processed: {total_stats['face']}")
+        print(f"  VL analyzed: {total_stats['vl']}")
 
-        return {"status": "complete"}
+        return total_stats
 
     def close(self):
         """清理资源"""
@@ -340,6 +378,7 @@ def main():
                         help="Batch size for vLLM inference")
     parser.add_argument("--limit", type=int, help="Limit number of images to process")
     parser.add_argument("--photos-dir", type=str, help="Photos directory path")
+    parser.add_argument("--force", action="store_true", help="Force refresh (re-process all images)")
 
     args = parser.parse_args()
 
@@ -371,16 +410,16 @@ def main():
                 print(f"  {key}: {value}")
 
         elif args.command == "refresh-exif":
-            # 强制重新刷新 EXIF 信息
-            analyzer.refresh_exif(limit=args.limit)
+            # 刷新 EXIF 信息
+            analyzer.refresh_exif(limit=args.limit, force=args.force)
 
         elif args.command == "refresh-faces":
-            # 强制重新刷新人脸信息
-            analyzer.refresh_faces(limit=args.limit, batch_size=args.batch_size)
+            # 刷新人脸信息
+            analyzer.refresh_faces(limit=args.limit, batch_size=args.batch_size, force=args.force)
 
         elif args.command == "refresh-vl":
-            # 强制重新刷新 VL 分析信息
-            analyzer.refresh_vl_analysis(limit=args.limit, batch_size=args.batch_size)
+            # 刷新 VL 分析信息
+            analyzer.refresh_vl_analysis(limit=args.limit, batch_size=args.batch_size, force=args.force)
 
     finally:
         analyzer.close()

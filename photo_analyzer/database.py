@@ -11,6 +11,22 @@ from contextlib import contextmanager
 from .models import DB_SCHEMA
 
 
+# 数据库迁移 SQL
+MIGRATION_SQL = """
+-- 添加新的处理标志列（如果不存在）
+ALTER TABLE images ADD COLUMN exif_processed BOOLEAN DEFAULT FALSE;
+ALTER TABLE images ADD COLUMN face_processed BOOLEAN DEFAULT FALSE;
+ALTER TABLE images ADD COLUMN vl_processed BOOLEAN DEFAULT FALSE;
+
+-- 从旧的 processed 字段迁移数据到新字段
+UPDATE images SET
+    exif_processed = processed,
+    face_processed = processed,
+    vl_processed = processed
+WHERE exif_processed IS NULL OR face_processed IS NULL OR vl_processed IS NULL;
+"""
+
+
 class Database:
     """SQLite 数据库操作类"""
 
@@ -35,9 +51,23 @@ class Database:
             conn.close()
 
     def _init_db(self):
-        """初始化数据库 schema"""
+        """初始化数据库 schema 并执行迁移"""
         with self.get_connection() as conn:
             conn.executescript(DB_SCHEMA)
+
+        # 执行数据库迁移（添加新列）
+        self._run_migrations()
+
+    def _run_migrations(self):
+        """
+        数据库迁移：添加新的处理标志列
+        将旧的单个 processed 字段迁移到三个独立的标志字段
+        """
+        try:
+            with self.get_connection() as conn:
+                conn.executescript(MIGRATION_SQL)
+        except sqlite3.Error:
+            pass  # 迁移可能因为列已存在而失败，这是正常的
 
     # ==================== Images 表操作 ====================
 
@@ -95,8 +125,14 @@ class Database:
             return dict(row) if row else None
 
     def get_unprocessed_images(self, limit: int = None) -> List[Dict]:
-        """获取未处理的图片"""
-        query = "SELECT * FROM images WHERE processed = FALSE"
+        """获取未完成处理的图片（任何阶段未完成）"""
+        query = """
+            SELECT * FROM images
+            WHERE exif_processed = FALSE
+               OR face_processed = FALSE
+               OR vl_processed = FALSE
+            ORDER BY id
+        """
         if limit:
             query += f" LIMIT {limit}"
         with self.get_connection() as conn:
@@ -115,9 +151,55 @@ class Database:
             return [dict(row) for row in cursor.fetchall()]
 
     def mark_processed(self, image_id: int):
-        """标记图片为已处理"""
+        """标记图片为已处理（所有阶段）"""
         with self.get_connection() as conn:
-            conn.execute("UPDATE images SET processed = TRUE WHERE id = ?", (image_id,))
+            conn.execute("""
+                UPDATE images
+                SET exif_processed = TRUE, face_processed = TRUE, vl_processed = TRUE
+                WHERE id = ?
+            """, (image_id,))
+
+    def mark_exif_processed(self, image_id: int):
+        """标记图片 EXIF 处理完成"""
+        with self.get_connection() as conn:
+            conn.execute("UPDATE images SET exif_processed = TRUE WHERE id = ?", (image_id,))
+
+    def mark_face_processed(self, image_id: int):
+        """标记图片人脸处理完成"""
+        with self.get_connection() as conn:
+            conn.execute("UPDATE images SET face_processed = TRUE WHERE id = ?", (image_id,))
+
+    def mark_vl_processed(self, image_id: int):
+        """标记图片 VL 处理完成"""
+        with self.get_connection() as conn:
+            conn.execute("UPDATE images SET vl_processed = TRUE WHERE id = ?", (image_id,))
+
+    def get_unprocessed_exif_images(self, limit: int = None) -> List[Dict]:
+        """获取未完成 EXIF 处理的图片"""
+        query = "SELECT * FROM images WHERE exif_processed = FALSE ORDER BY id"
+        if limit:
+            query += f" LIMIT {limit}"
+        with self.get_connection() as conn:
+            cursor = conn.execute(query)
+            return [dict(row) for row in cursor.fetchall()]
+
+    def get_unprocessed_face_images(self, limit: int = None) -> List[Dict]:
+        """获取未完成人脸处理的图片"""
+        query = "SELECT * FROM images WHERE face_processed = FALSE ORDER BY id"
+        if limit:
+            query += f" LIMIT {limit}"
+        with self.get_connection() as conn:
+            cursor = conn.execute(query)
+            return [dict(row) for row in cursor.fetchall()]
+
+    def get_unprocessed_vl_images(self, limit: int = None) -> List[Dict]:
+        """获取未完成 VL 处理的图片"""
+        query = "SELECT * FROM images WHERE vl_processed = FALSE ORDER BY id"
+        if limit:
+            query += f" LIMIT {limit}"
+        with self.get_connection() as conn:
+            cursor = conn.execute(query)
+            return [dict(row) for row in cursor.fetchall()]
 
     def image_exists(self, file_path: str) -> bool:
         """检查图片是否已存在"""
@@ -143,9 +225,14 @@ class Database:
             return cursor.fetchone()[0]
 
     def get_processed_count(self) -> int:
-        """获取已处理图片数量"""
+        """获取已处理图片数量（所有阶段都完成）"""
         with self.get_connection() as conn:
-            cursor = conn.execute("SELECT COUNT(*) FROM images WHERE processed = TRUE")
+            cursor = conn.execute("""
+                SELECT COUNT(*) FROM images
+                WHERE exif_processed = TRUE
+                  AND face_processed = TRUE
+                  AND vl_processed = TRUE
+            """)
             return cursor.fetchone()[0]
 
     # ==================== EXIF 表操作 ====================
@@ -300,3 +387,22 @@ class Database:
                 LIMIT ?
             """, (limit // 10,))
             return [dict(row) for row in cursor.fetchall()]
+
+    def get_stage_counts(self) -> Dict[str, int]:
+        """获取各阶段处理状态统计"""
+        with self.get_connection() as conn:
+            cursor = conn.execute("""
+                SELECT
+                    COUNT(*) as total,
+                    SUM(CASE WHEN exif_processed THEN 1 ELSE 0 END) as exif_done,
+                    SUM(CASE WHEN face_processed THEN 1 ELSE 0 END) as face_done,
+                    SUM(CASE WHEN vl_processed THEN 1 ELSE 0 END) as vl_done
+                FROM images
+            """)
+            row = cursor.fetchone()
+            return {
+                "total_images": row["total"] or 0,
+                "exif_processed": row["exif_done"] or 0,
+                "face_processed": row["face_done"] or 0,
+                "vl_processed": row["vl_done"] or 0,
+            }

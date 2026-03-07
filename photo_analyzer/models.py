@@ -14,7 +14,9 @@ CREATE TABLE IF NOT EXISTS images (
     format TEXT,
     captured_at TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    processed BOOLEAN DEFAULT FALSE
+    exif_processed BOOLEAN DEFAULT FALSE,
+    face_processed BOOLEAN DEFAULT FALSE,
+    vl_processed BOOLEAN DEFAULT FALSE
 );
 
 -- EXIF 信息
@@ -97,7 +99,9 @@ CREATE TRIGGER IF NOT EXISTS images_au AFTER UPDATE ON images BEGIN
 END;
 
 -- 索引优化
-CREATE INDEX IF NOT EXISTS idx_images_processed ON images(processed);
+CREATE INDEX IF NOT EXISTS idx_images_exif_processed ON images(exif_processed);
+CREATE INDEX IF NOT EXISTS idx_images_face_processed ON images(face_processed);
+CREATE INDEX IF NOT EXISTS idx_images_vl_processed ON images(vl_processed);
 CREATE INDEX IF NOT EXISTS idx_images_path ON images(file_path);
 CREATE INDEX IF NOT EXISTS idx_images_captured_at ON images(captured_at);
 CREATE INDEX IF NOT EXISTS idx_faces_person ON faces(person_name);

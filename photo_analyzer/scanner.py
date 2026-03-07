@@ -141,13 +141,14 @@ class ImageScanner:
         """
         total_images = sum(1 for _ in self.scan_directory())
         db_count = self.db.get_image_count()
-        processed_count = self.db.get_processed_count()
+        stage_counts = self.db.get_stage_counts()
 
         return {
             "total_files_on_disk": total_images,
             "total_in_database": db_count,
-            "processed": processed_count,
-            "unprocessed": db_count - processed_count,
+            "exif_processed": stage_counts["exif_processed"],
+            "face_processed": stage_counts["face_processed"],
+            "vl_processed": stage_counts["vl_processed"],
             "not_in_database": total_images - db_count,
         }
 
