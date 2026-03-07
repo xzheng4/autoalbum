@@ -169,10 +169,6 @@ class VLAnalyzer:
             batch_results = self._process_batch(batch)
             results.extend(batch_results)
 
-            # 打印进度
-            processed = min(i + self.batch_size, len(image_paths))
-            print(f"Processed {processed}/{len(image_paths)} images")
-
         return results
 
     def _process_batch(self, image_paths: List[str]) -> List[Optional[Dict[str, Any]]]:
