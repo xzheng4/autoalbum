@@ -57,6 +57,21 @@
 ### 指令 10: 人脸识别说明
 data/faces 下的每一个子目录都是一个家庭成员的单人照片。人脸识别从每个人的多张图片中提取人脸信息后用于分析 data/photos/ 下面的照片
 
+### 指令 11: 添加清空数据功能
+给 tools/check_db.py 增加清空全部数据、清空人脸数据、清空 VL 分析数据的功能，支持 --clear-all、--clear-faces、--clear-vl 参数
+
+### 指令 12: 添加刷新命令
+photo_analyzer 增加 refresh-faces 和 refresh-vl 命令：
+- refresh-faces: 强制重新刷新人脸信息并登记数据库（保留 VL 分析数据）
+- refresh-vl: 强制重新刷新 VL 图片理解信息（保留人脸信息）
+
+### 指令 13: 修复 refresh-faces bug
+refresh-faces 以后显示 Face records updated: 0，人脸信息没有本顺利更新到数据库。需要 Fix。
+修复了 main.py 中 face_encoding 和 face_embedding 的 key 名称不匹配问题
+
+### 指令 14: 更新 README
+更新 README.md 文档，添加新功能说明和工具使用文档
+
 ---
 
 ## 项目实现状态
@@ -73,6 +88,8 @@ data/faces 下的每一个子目录都是一个家庭成员的单人照片。人
 - [x] 推送到远程仓库
 - [x] .gitignore 排除 data/ 目录
 - [x] tools/check_db.py 数据库检查工具
+- [x] refresh-faces 和 refresh-vl 命令
+- [x] 修复 face_encoding/face_embedding key 名称不匹配 bug
 
 ---
 
