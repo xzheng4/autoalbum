@@ -75,11 +75,11 @@ class PhotoAnalyzer:
             # 4. 人脸识别
             faces = self.face_recognizer.recognize_faces(image_path)
             for face in faces:
-                if face.get('face_encoding'):
+                if face.get('face_embedding'):
                     self.db.add_face(
                         image_id=image_id,
                         person_name=face.get('person_name', '未知'),
-                        face_encoding=face.get('face_encoding'),
+                        face_encoding=face.get('face_embedding'),
                         bbox=face.get('bbox', (0, 0, 0, 0)),
                         confidence=face.get('confidence'),
                     )
@@ -240,11 +240,11 @@ class PhotoAnalyzer:
 
                     # 保存新的人脸数据
                     for face in faces:
-                        if face.get('face_encoding'):
+                        if face.get('face_embedding'):
                             self.db.add_face(
                                 image_id=image_id,
                                 person_name=face.get('person_name', '未知'),
-                                face_encoding=face.get('face_encoding'),
+                                face_encoding=face.get('face_embedding'),
                                 bbox=face.get('bbox', (0, 0, 0, 0)),
                                 confidence=face.get('confidence'),
                             )
