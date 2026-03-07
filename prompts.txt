@@ -93,6 +93,13 @@ refresh-faces 以后显示 Face records updated: 0，人脸信息没有本顺利
 
 所有处理过程都带有 tqdm 进度条。
 
+### 指令 18: 支持断点续传
+analyze 命令每次中断后重启会重复处理所有图片，需要支持断点续传。
+- 数据库 images 表添加三个独立处理标志：exif_processed, face_processed, vl_processed
+- refresh-exif/refresh-faces/refresh-vl 默认只处理未完成的图片
+- 添加 --force 参数用于强制刷新所有图片
+- analyze 命令跳过已完成阶段，从中断处继续处理
+
 ---
 
 ## 项目实现状态
@@ -112,6 +119,7 @@ refresh-faces 以后显示 Face records updated: 0，人脸信息没有本顺利
 - [x] refresh-exif、refresh-faces 和 refresh-vl 命令
 - [x] 修复 face_encoding/face_embedding key 名称不匹配 bug
 - [x] 重构分析流程为三阶段独立处理
+- [x] 支持断点续传（三阶段独立标记）
 
 ---
 
