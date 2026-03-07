@@ -195,12 +195,19 @@ def clear_faces(db_path: str = None, confirm: bool = False):
     try:
         db = Database(db_path)
         with db.get_connection() as conn:
+            # 删除人脸数据
             cursor = conn.execute("DELETE FROM faces")
             deleted = cursor.rowcount
+
+            # 重置人脸处理标志
+            conn.execute("UPDATE images SET face_processed = FALSE")
+
             conn.commit()
 
         print(f"\n已删除 {deleted} 条人脸记录")
-        print("人脸数据已清空，可以重新运行分析来识别人脸")
+        print("人脸数据已清空，face_processed 标志已重置")
+        print("请重新运行 refresh-faces 来识别人脸：")
+        print("  python -m photo_analyzer.main refresh-faces")
     except Exception as e:
         print(f"错误：{e}")
 
@@ -227,12 +234,19 @@ def clear_vl_analysis(db_path: str = None, confirm: bool = False):
     try:
         db = Database(db_path)
         with db.get_connection() as conn:
+            # 删除 VL 分析数据
             cursor = conn.execute("DELETE FROM vl_analysis")
             deleted = cursor.rowcount
+
+            # 重置 VL 处理标志
+            conn.execute("UPDATE images SET vl_processed = FALSE")
+
             conn.commit()
 
         print(f"\n已删除 {deleted} 条 VL 分析记录")
-        print("VL 分析数据已清空，可以重新运行分析来进行 OCR 和图片理解")
+        print("VL 分析数据已清空，vl_processed 标志已重置")
+        print("请重新运行 refresh-vl 来进行 OCR 和图片理解：")
+        print("  python -m photo_analyzer.main refresh-vl")
     except Exception as e:
         print(f"错误：{e}")
 
