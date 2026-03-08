@@ -204,6 +204,61 @@ def check_database(db_path: str = None, limit: int = 10, first: bool = False, ra
     print(f"总共有 {total_count} 张图片")
 
 
+def check_vl_json(db_path: str = None, limit: int = 10):
+    """
+    从已处理 VL 的图片中随机抽取，显示 VL 分析的原始 JSON 数据
+
+    Args:
+        db_path: 数据库路径
+        limit: 抽取的图片数量
+    """
+    db_path = db_path or str(DATABASE_PATH)
+
+    print_separator("VL 分析 JSON 检查")
+    print(f"数据库路径：{db_path}")
+    print(f"随机抽取 {limit} 张已处理 VL 的图片\n")
+
+    try:
+        db = Database(db_path)
+    except Exception as e:
+        print(f"错误：无法打开数据库 - {e}")
+        return
+
+    # 获取随机图片
+    images = db.get_random_processed_vl_images(limit=limit)
+
+    if not images:
+        print("没有找到已处理 VL 的图片")
+        return
+
+    for image in images:
+        image_id = image['id']
+        vl_analysis = db.get_vl_analysis(image_id)
+
+        print(f"\n【图片 ID: {image_id}】")
+        print(f"文件：{Path(image['file_path']).name}")
+        print("-" * 40)
+
+        if vl_analysis:
+            # 提取 VL 分析数据
+            vl_data = {
+                "ocr_text": vl_analysis.get('ocr_text', ''),
+                "scene_description": vl_analysis.get('scene_description', ''),
+                "category": vl_analysis.get('category', ''),
+                "objects": vl_analysis.get('objects', []),
+                "mood": vl_analysis.get('mood', ''),
+                "confidence": vl_analysis.get('confidence', 0),
+            }
+            # 格式化输出 JSON
+            print(json.dumps(vl_data, ensure_ascii=False, indent=2))
+        else:
+            print("[无 VL 分析数据]")
+
+    # 打印总结
+    print_separator("检查完成")
+    print(f"已显示 {len(images)} 张图片的 VL JSON 数据")
+
+
 def clear_faces(db_path: str = None, confirm: bool = False):
     """
     清空所有人脸数据
@@ -333,6 +388,8 @@ def main():
                         help="显示最先添加的图片（默认显示最后添加的）")
     parser.add_argument("--random", action="store_true",
                         help="随机抽取图片")
+    parser.add_argument("--vl-json", action="store_true",
+                        help="从已处理 VL 的图片中随机抽取，显示 VL JSON 数据")
 
     # 清空数据选项
     clear_group = parser.add_argument_group("清空数据选项")
@@ -354,6 +411,9 @@ def main():
         clear_faces(db_path=args.db, confirm=args.yes)
     elif args.clear_vl:
         clear_vl_analysis(db_path=args.db, confirm=args.yes)
+    elif args.vl_json:
+        # 显示 VL JSON 数据
+        check_vl_json(db_path=args.db, limit=args.limit)
     else:
         # 默认检查数据库
         check_database(db_path=args.db, limit=args.limit, first=args.first, random=args.random)

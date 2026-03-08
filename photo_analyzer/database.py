@@ -178,6 +178,18 @@ class Database:
             cursor = conn.execute(query)
             return [dict(row) for row in cursor.fetchall()]
 
+    def get_random_processed_vl_images(self, limit: int = 10) -> List[Dict]:
+        """从已处理 VL 的图片中随机获取指定数量"""
+        query = """
+            SELECT * FROM images
+            WHERE vl_processed = TRUE
+            ORDER BY RANDOM()
+            LIMIT ?
+        """
+        with self.get_connection() as conn:
+            cursor = conn.execute(query, (limit,))
+            return [dict(row) for row in cursor.fetchall()]
+
     def image_exists(self, file_path: str) -> bool:
         """检查图片是否已存在"""
         with self.get_connection() as conn:
