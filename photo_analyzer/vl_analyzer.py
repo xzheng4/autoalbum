@@ -69,7 +69,7 @@ class VLAnalyzer:
 
             self.sampling_params = SamplingParams(
                 temperature=0.1,
-                max_tokens=1024,
+                max_tokens=2048,
                 top_p=0.95,
             )
 

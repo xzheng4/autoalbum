@@ -28,6 +28,8 @@
             人物：<strong>{{ request.args.get('person') }}</strong>
         {% elif request.args.get('year') %}
             年份：<strong>{{ request.args.get('year') }}</strong>
+        {% elif request.args.get('camera') %}
+            设备：<strong>{{ request.args.get('camera').replace('+', ' ') }}</strong>
         {% else %}
             全部图片
         {% endif %}

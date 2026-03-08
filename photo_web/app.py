@@ -301,6 +301,7 @@ def images_list():
     location = request.args.get("location", "")
     person = request.args.get("person", "")
     year = request.args.get("year", "")
+    camera = request.args.get("camera", "")
     obj = request.args.get("object", "")
     limit = request.args.get("limit", 100, type=int)
 
@@ -316,6 +317,14 @@ def images_list():
         images = db.get_images_by_person(person)
     elif year:
         images = db.get_images_by_year(year, limit)
+    elif camera:
+        # camera 参数格式："make+model" 或 "make"
+        from urllib.parse import unquote
+        camera_unquoted = unquote(camera.replace("+", " "))
+        parts = camera_unquoted.split(" ", 1)
+        make = parts[0]
+        model = parts[1] if len(parts) > 1 else None
+        images = db.get_images_by_camera(make, model, limit)
     else:
         images = db.get_all_images(limit=limit)
 

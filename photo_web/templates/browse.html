@@ -4,11 +4,11 @@
 
 {% block content %}
 <div class="row">
-    <!-- 左侧分类导航 -->
+    <!-- 左侧顶级分类导航 -->
     <div class="col-md-3 col-lg-2">
         <div class="sticky-top" style="top: 80px; z-index: 100; max-height: calc(100vh - 100px); overflow-y: auto;">
 
-            <!-- 1. 按拍摄时间（年份）分类 -->
+            <!-- 1. 拍摄时间 -->
             <div class="card mb-3">
                 <div class="card-header bg-primary text-white">
                     <i class="bi bi-calendar"></i> 拍摄时间
@@ -17,7 +17,7 @@
                     <div class="list-group list-group-flush">
                         {% for year in year_stats %}
                         <a href="#year-{{ year.year }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
-                            <span>{{ year.year }}年</span>
+                            <span>{{ year.year }}</span>
                             <span class="badge bg-primary rounded-pill">{{ year.count }}</span>
                         </a>
                         {% endfor %}
@@ -25,25 +25,7 @@
                 </div>
             </div>
 
-            <!-- 2. 按拍摄设备分类 -->
-            <div class="card mb-3">
-                <div class="card-header bg-secondary text-white">
-                    <i class="bi bi-camera"></i> 拍摄设备
-                </div>
-                <div class="card-body p-2" style="max-height: 250px; overflow-y: auto;">
-                    <div class="list-group list-group-flush">
-                        {% for cam in camera_stats %}
-                        <a href="#camera-{{ cam.make }}-{{ cam.model }}" class="list-group-item list-group-item-action small">
-                            <div>{{ cam.make }}</div>
-                            <div class="text-muted" style="font-size: 0.75rem;">{{ cam.model }}</div>
-                            <span class="badge bg-secondary float-end">{{ cam.count }}</span>
-                        </a>
-                        {% endfor %}
-                    </div>
-                </div>
-            </div>
-
-            <!-- 3. 按人物分类 -->
+            <!-- 2. 家庭成员 -->
             <div class="card mb-3">
                 <div class="card-header bg-info text-white">
                     <i class="bi bi-people"></i> 家庭成员
@@ -60,27 +42,35 @@
                 </div>
             </div>
 
-            <!-- 4. 户外照片 -->
+            <!-- 3. 拍摄设备 -->
             <div class="card mb-3">
-                <div class="card-header bg-success text-white">
-                    <i class="bi bi-sun"></i> 户外
+                <div class="card-header bg-secondary text-white">
+                    <i class="bi bi-camera"></i> 拍摄设备
                 </div>
                 <div class="card-body p-2">
-                    <a href="#outdoor" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
-                        <span>户外照片</span>
-                        <span class="badge bg-success rounded-pill">{{ location_stats.outdoor }}</span>
-                    </a>
+                    <div class="list-group list-group-flush">
+                        {% for cam in camera_stats %}
+                        <a href="#camera-{{ cam.make }}-{{ cam.model }}" class="list-group-item list-group-item-action small">
+                            <div>{{ cam.make }} {{ cam.model }}</div>
+                            <span class="badge bg-secondary float-end">{{ cam.count }}</span>
+                        </a>
+                        {% endfor %}
+                    </div>
                 </div>
             </div>
 
-            <!-- 5. 室内照片 -->
+            <!-- 4. 地点 -->
             <div class="card">
-                <div class="card-header bg-warning text-dark">
-                    <i class="bi bi-house"></i> 室内
+                <div class="card-header bg-success text-white">
+                    <i class="bi bi-geo-alt"></i> 地点
                 </div>
                 <div class="card-body p-2">
+                    <a href="#outdoor" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center mb-2">
+                        <span><i class="bi bi-sun"></i> 户外</span>
+                        <span class="badge bg-success rounded-pill">{{ location_stats.outdoor }}</span>
+                    </a>
                     <a href="#indoor" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
-                        <span>室内照片</span>
+                        <span><i class="bi bi-house"></i> 室内</span>
                         <span class="badge bg-warning text-dark rounded-pill">{{ location_stats.indoor }}</span>
                     </a>
                 </div>
@@ -88,12 +78,12 @@
         </div>
     </div>
 
-    <!-- 右侧照片集合 -->
+    <!-- 右侧子分类缩略图集合 -->
     <div class="col-md-9 col-lg-10">
 
-        <!-- 按年份分组的照片 -->
+        <!-- 拍摄时间 - 子分类缩略图集合 -->
         <div id="year-section">
-            <h4 class="mb-3"><i class="bi bi-calendar"></i> 按拍摄时间分类</h4>
+            <h4 class="mb-3"><i class="bi bi-calendar"></i> 拍摄时间</h4>
             {% for year in year_stats %}
             <div class="card mb-4" id="year-{{ year.year }}">
                 <div class="card-header d-flex justify-content-between align-items-center bg-light">
@@ -124,9 +114,9 @@
             {% endfor %}
         </div>
 
-        <!-- 按人物分组的照片 -->
+        <!-- 家庭成员 - 子分类缩略图集合 -->
         <div id="person-section">
-            <h4 class="mb-3"><i class="bi bi-people"></i> 按家庭成员分类</h4>
+            <h4 class="mb-3"><i class="bi bi-people"></i> 家庭成员</h4>
             {% for person in persons_data %}
             <div class="card mb-4" id="person-{{ person.person_name }}">
                 <div class="card-header d-flex justify-content-between align-items-center bg-light">
@@ -157,9 +147,9 @@
             {% endfor %}
         </div>
 
-        <!-- 按拍摄设备分组的照片 -->
+        <!-- 拍摄设备 - 子分类缩略图集合 -->
         <div id="camera-section">
-            <h4 class="mb-3"><i class="bi bi-camera"></i> 按拍摄设备分类</h4>
+            <h4 class="mb-3"><i class="bi bi-camera"></i> 拍摄设备</h4>
             {% for cam in camera_stats %}
             <div class="card mb-4" id="camera-{{ cam.make }}-{{ cam.model }}">
                 <div class="card-header d-flex justify-content-between align-items-center bg-light">
@@ -170,73 +160,80 @@
                     <span class="badge bg-secondary">{{ cam.count }} 张</span>
                 </div>
                 <div class="card-body">
+                    {% if cam.preview_thumbnail %}
                     <div class="photo-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.75rem;">
-                        {% if cam.preview_thumbnail %}
                         <div class="photo-card card">
-                            <a href="/image/{{ cam.sample_image_id }}">
+                            <a href="/images?camera={{ cam.make }}+{{ cam.model }}">
                                 <div class="thumbnail-container">
                                     <img src="data:image/jpeg;base64,{{ cam.preview_thumbnail }}" loading="lazy" alt="sample">
                                 </div>
                             </a>
                         </div>
-                        {% endif %}
                     </div>
+                    {% endif %}
                     <div class="text-center mt-2">
-                        <span class="text-muted">共 {{ cam.count }} 张照片使用该设备拍摄</span>
+                        <a href="/images?camera={{ cam.make }}+{{ cam.model }}" class="btn btn-sm btn-outline-secondary">
+                            查看全部 {{ cam.count }} 张照片 <i class="bi bi-arrow-right"></i>
+                        </a>
                     </div>
                 </div>
             </div>
             {% endfor %}
         </div>
 
-        <!-- 户外照片 -->
-        <div id="outdoor" class="card mb-4">
-            <div class="card-header d-flex justify-content-between align-items-center bg-success text-white">
-                <h5 class="mb-0"><i class="bi bi-sun"></i> 户外照片</h5>
-                <span class="badge bg-light text-dark">{{ location_stats.outdoor }} 张</span>
-            </div>
-            <div class="card-body">
-                <div class="photo-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.75rem;">
-                    {% for img in location_stats.outdoor_preview %}
-                    <div class="photo-card card">
-                        <a href="/image/{{ img.id }}">
-                            <div class="thumbnail-container">
-                                <img src="data:image/jpeg;base64,{{ img.thumbnail }}" loading="lazy" alt="{{ img.file_path }}">
-                            </div>
-                        </a>
-                    </div>
-                    {% endfor %}
-                </div>
-                <div class="text-center mt-2">
-                    <a href="/images?location=outdoor" class="btn btn-sm btn-outline-success">
-                        查看全部 {{ location_stats.outdoor }} 张照片 <i class="bi bi-arrow-right"></i>
-                    </a>
-                </div>
-            </div>
-        </div>
+        <!-- 地点 - 子分类缩略图集合 -->
+        <div id="location-section">
+            <h4 class="mb-3"><i class="bi bi-geo-alt"></i> 地点</h4>
 
-        <!-- 室内照片 -->
-        <div id="indoor" class="card mb-4">
-            <div class="card-header d-flex justify-content-between align-items-center bg-warning">
-                <h5 class="mb-0"><i class="bi bi-house"></i> 室内照片</h5>
-                <span class="badge bg-dark">{{ location_stats.indoor }} 张</span>
-            </div>
-            <div class="card-body">
-                <div class="photo-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.75rem;">
-                    {% for img in location_stats.indoor_preview %}
-                    <div class="photo-card card">
-                        <a href="/image/{{ img.id }}">
-                            <div class="thumbnail-container">
-                                <img src="data:image/jpeg;base64,{{ img.thumbnail }}" loading="lazy" alt="{{ img.file_path }}">
-                            </div>
+            <!-- 户外 -->
+            <div id="outdoor" class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center bg-success text-white">
+                    <h5 class="mb-0"><i class="bi bi-sun"></i> 户外</h5>
+                    <span class="badge bg-light text-dark">{{ location_stats.outdoor }} 张</span>
+                </div>
+                <div class="card-body">
+                    <div class="photo-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.75rem;">
+                        {% for img in location_stats.outdoor_preview %}
+                        <div class="photo-card card">
+                            <a href="/image/{{ img.id }}">
+                                <div class="thumbnail-container">
+                                    <img src="data:image/jpeg;base64,{{ img.thumbnail }}" loading="lazy" alt="{{ img.file_path }}">
+                                </div>
+                            </a>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div class="text-center mt-2">
+                        <a href="/images?location=outdoor" class="btn btn-sm btn-outline-success">
+                            查看全部 {{ location_stats.outdoor }} 张照片 <i class="bi bi-arrow-right"></i>
                         </a>
                     </div>
-                    {% endfor %}
                 </div>
-                <div class="text-center mt-2">
-                    <a href="/images?location=indoor" class="btn btn-sm btn-outline-warning text-dark">
-                        查看全部 {{ location_stats.indoor }} 张照片 <i class="bi bi-arrow-right"></i>
-                    </a>
+            </div>
+
+            <!-- 室内 -->
+            <div id="indoor" class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center bg-warning">
+                    <h5 class="mb-0"><i class="bi bi-house"></i> 室内</h5>
+                    <span class="badge bg-dark">{{ location_stats.indoor }} 张</span>
+                </div>
+                <div class="card-body">
+                    <div class="photo-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.75rem;">
+                        {% for img in location_stats.indoor_preview %}
+                        <div class="photo-card card">
+                            <a href="/image/{{ img.id }}">
+                                <div class="thumbnail-container">
+                                    <img src="data:image/jpeg;base64,{{ img.thumbnail }}" loading="lazy" alt="{{ img.file_path }}">
+                                </div>
+                            </a>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div class="text-center mt-2">
+                        <a href="/images?location=indoor" class="btn btn-sm btn-outline-warning text-dark">
+                            查看全部 {{ location_stats.indoor }} 张照片 <i class="bi bi-arrow-right"></i>
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>

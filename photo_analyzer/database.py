@@ -290,6 +290,30 @@ class Database:
             )
             return [row[0] for row in cursor.fetchall()]
 
+    def get_images_by_camera(self, make: str, model: str = None, limit: int = 100) -> List[Dict]:
+        """按拍摄设备获取图片"""
+        with self.get_connection() as conn:
+            if model:
+                query = """
+                    SELECT DISTINCT i.* FROM images i
+                    JOIN exif_data e ON i.id = e.image_id
+                    WHERE e.make = ? AND e.model = ?
+                    ORDER BY i.captured_at DESC
+                    LIMIT ?
+                """
+                params = (make, model, limit)
+            else:
+                query = """
+                    SELECT DISTINCT i.* FROM images i
+                    JOIN exif_data e ON i.id = e.image_id
+                    WHERE e.make = ?
+                    ORDER BY i.captured_at DESC
+                    LIMIT ?
+                """
+                params = (make, limit)
+            cursor = conn.execute(query, params)
+            return [dict(row) for row in cursor.fetchall()]
+
     # ==================== VL Analysis 表操作 ====================
 
     def add_vl_analysis(self, image_id: int, ocr_text: str = None,
