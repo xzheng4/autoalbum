@@ -233,13 +233,20 @@ class VLAnalyzer:
     def _parse_response(self, content: str) -> Optional[Dict[str, Any]]:
         """解析模型返回的 JSON 内容"""
         try:
-            # 清理可能的 markdown 格式
+            # 清理 markdown 格式
             content = content.strip()
             if content.startswith("```json"):
                 content = content[7:]
+            elif content.startswith("```"):
+                content = content[3:]
             if content.endswith("```"):
                 content = content[:-3]
             content = content.strip()
+
+            # 尝试修复常见的 JSON 格式问题
+            # 1. 替换未转义的双引号（在字符串值中的）
+            # 2. 替换换行符为空格
+            content = content.replace('\n', ' ').replace('\r', '')
 
             # 解析 JSON
             result = json.loads(content)
@@ -255,7 +262,30 @@ class VLAnalyzer:
             }
 
         except Exception as e:
+            # 尝试使用更宽松的方式解析
+            try:
+                # 尝试提取 JSON 部分（如果响应包含额外文本）
+                import re
+                json_match = re.search(r'\{.*\}', content, re.DOTALL)
+                if json_match:
+                    json_str = json_match.group(0)
+                    # 尝试修复常见的字符串问题
+                    json_str = self._fix_json_string(json_str)
+                    result = json.loads(json_str)
+                    return {
+                        "ocr_text": result.get("ocr_text", ""),
+                        "scene_description": result.get("scene_description", ""),
+                        "category": result.get("category", "other"),
+                        "objects": result.get("objects", []),
+                        "mood": result.get("mood", ""),
+                        "confidence": float(result.get("confidence", 0.5)),
+                    }
+            except:
+                pass
+
             print(f"Error parsing response JSON: {e}")
+            print(f"Raw content: {content[:200]}...")
+
             # 返回一个默认结果
             return {
                 "ocr_text": "",
@@ -265,6 +295,39 @@ class VLAnalyzer:
                 "mood": "",
                 "confidence": 0.3,
             }
+
+    def _fix_json_string(self, json_str: str) -> str:
+        """
+        修复常见的 JSON 字符串问题
+
+        Args:
+            json_str: 可能有问题的 JSON 字符串
+
+        Returns:
+            修复后的 JSON 字符串
+        """
+        # 移除字符串值中的未转义换行符
+        in_string = False
+        escape_next = False
+        result = []
+
+        for char in json_str:
+            if escape_next:
+                result.append(char)
+                escape_next = False
+            elif char == '\\':
+                result.append(char)
+                escape_next = True
+            elif char == '"' and not escape_next:
+                in_string = not in_string
+                result.append(char)
+            elif char in '\n\r' and in_string:
+                # 在字符串中的换行符替换为空格
+                result.append(' ')
+            else:
+                result.append(char)
+
+        return ''.join(result)
 
     def close(self):
         """释放资源"""
