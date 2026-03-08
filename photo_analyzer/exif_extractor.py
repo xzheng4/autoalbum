@@ -68,7 +68,9 @@ class EXIFExtractor:
                         elif tag == 'LensModel':
                             result['lens_model'] = value
                         elif tag == 'DateTimeOriginal':
-                            result['captured_at'] = value
+                            # 格式：'YYYY:MM:DD HH:MM:SS' -> 'YYYY-MM-DD HH:MM:SS'
+                            if value:
+                                result['captured_at'] = value.replace(':', '-', 2).replace(':', '-')
                         elif tag == 'GPSInfo':
                             gps_data = self._parse_gps_info(value)
                             result.update(gps_data)

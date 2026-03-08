@@ -315,16 +315,7 @@ def images_list():
     elif person:
         images = db.get_images_by_person(person)
     elif year:
-        with db.get_connection() as conn:
-            cursor = conn.execute("""
-                SELECT i.*, v.category
-                FROM images i
-                JOIN vl_analysis v ON i.id = v.image_id
-                WHERE strftime('%Y', i.captured_at) = ?
-                ORDER BY i.captured_at DESC
-                LIMIT ?
-            """, (year, limit))
-            images = [dict(row) for row in cursor.fetchall()]
+        images = db.get_images_by_year(year, limit)
     else:
         images = db.get_all_images(limit=limit)
 

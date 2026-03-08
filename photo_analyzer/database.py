@@ -477,12 +477,13 @@ class Database:
             return [dict(row) for row in cursor.fetchall()]
 
     def get_year_stats(self) -> List[Dict]:
-        """获取按年份统计的图片数量"""
+        """获取按年份统计的图片数量（基于 images.captured_at）"""
         with self.get_connection() as conn:
             cursor = conn.execute("""
                 SELECT
                     CASE
                         WHEN captured_at IS NULL THEN '未知'
+                        WHEN captured_at = '' THEN '未知'
                         WHEN strftime('%Y', captured_at) IS NULL THEN '未知'
                         ELSE strftime('%Y', captured_at)
                     END as year,
@@ -496,27 +497,32 @@ class Database:
             return [dict(row) for row in cursor.fetchall()]
 
     def get_images_by_year(self, year: str, limit: int = 100) -> List[Dict]:
-        """按年份获取图片"""
+        """按年份获取图片（基于 images.captured_at）"""
         if year == "未知":
             query = """
                 SELECT i.*, v.category
                 FROM images i
                 LEFT JOIN vl_analysis v ON i.id = v.image_id
-                WHERE i.captured_at IS NULL OR strftime('%Y', i.captured_at) IS NULL
+                WHERE i.captured_at IS NULL
+                   OR i.captured_at = ''
+                   OR strftime('%Y', i.captured_at) IS NULL
                 ORDER BY i.id DESC
                 LIMIT ?
             """
+            params = (limit,)
         else:
             query = """
                 SELECT i.*, v.category
                 FROM images i
-                JOIN vl_analysis v ON i.id = v.image_id
+                LEFT JOIN vl_analysis v ON i.id = v.image_id
                 WHERE strftime('%Y', i.captured_at) = ?
                 ORDER BY i.captured_at DESC
                 LIMIT ?
             """
+            params = (year, limit)
+
         with self.get_connection() as conn:
-            cursor = conn.execute(query, (year,) if year != "未知" else (limit,))
+            cursor = conn.execute(query, params)
             return [dict(row) for row in cursor.fetchall()]
 
     def get_person_stats_with_images(self) -> List[Dict]:
