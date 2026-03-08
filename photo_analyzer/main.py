@@ -281,23 +281,27 @@ class PhotoAnalyzer:
             # 保存结果
             for image_id, vl_result in zip(image_ids, vl_results):
                 try:
+                    # VL 分析失败，跳过该图片（不标记为已处理）
+                    if vl_result is None:
+                        stats["failed"] += 1
+                        continue
+
                     # 删除旧的 VL 分析数据
                     with self.db.get_connection() as conn:
                         conn.execute("DELETE FROM vl_analysis WHERE image_id = ?", (image_id,))
                         conn.commit()
 
                     # 保存新的 VL 分析数据
-                    if vl_result:
-                        self.db.add_vl_analysis(
-                            image_id=image_id,
-                            ocr_text=vl_result.get('ocr_text'),
-                            scene_description=vl_result.get('scene_description'),
-                            category=vl_result.get('category'),
-                            objects=vl_result.get('objects'),
-                            mood=vl_result.get('mood'),
-                            confidence=vl_result.get('confidence'),
-                        )
-                        stats["updated"] += 1
+                    self.db.add_vl_analysis(
+                        image_id=image_id,
+                        ocr_text=vl_result.get('ocr_text'),
+                        scene_description=vl_result.get('scene_description'),
+                        category=vl_result.get('category'),
+                        objects=vl_result.get('objects'),
+                        mood=vl_result.get('mood'),
+                        confidence=vl_result.get('confidence'),
+                    )
+                    stats["updated"] += 1
 
                     # 标记为已处理
                     self.db.mark_vl_processed(image_id)

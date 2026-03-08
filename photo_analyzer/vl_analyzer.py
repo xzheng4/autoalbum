@@ -283,18 +283,10 @@ class VLAnalyzer:
             except:
                 pass
 
+            # JSON 解析失败，返回 None 表示需要跳过该图片
             print(f"Error parsing response JSON: {e}")
             print(f"Raw content: {content[:200]}...")
-
-            # 返回一个默认结果
-            return {
-                "ocr_text": "",
-                "scene_description": content[:200] if content else "",
-                "category": "other",
-                "objects": [],
-                "mood": "",
-                "confidence": 0.3,
-            }
+            return None
 
     def _fix_json_string(self, json_str: str) -> str:
         """
