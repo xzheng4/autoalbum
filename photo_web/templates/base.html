@@ -217,6 +217,11 @@
                         </a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint == 'browse' %}active{% endif %}" href="/browse">
+                            <i class="bi bi-grid-3x3-gap"></i> 浏览
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link {% if request.endpoint == 'gallery' %}active{% endif %}" href="/gallery">
                             <i class="bi bi-grid"></i> 画廊
                         </a>

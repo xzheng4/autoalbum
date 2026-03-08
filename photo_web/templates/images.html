@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}图片列表{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-images"></i> 图片列表</h2>
+    <div>
+        <a href="/browse" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> 返回分类
+        </a>
+        <a href="/gallery" class="btn btn-outline-primary">
+            <i class="bi bi-grid"></i> 画廊视图
+        </a>
+    </div>
+</div>
+
+{% if images %}
+<div class="alert alert-info d-flex justify-content-between align-items-center">
+    <span>
+        {% if request.args.get('category') %}
+            分类：<strong>{{ request.args.get('category') }}</strong>
+        {% elif request.args.get('mood') %}
+            氛围：<strong>{{ request.args.get('mood') }}</strong>
+        {% elif request.args.get('location') %}
+            位置：<strong>{{ request.args.get('location') }}</strong>
+        {% elif request.args.get('person') %}
+            人物：<strong>{{ request.args.get('person') }}</strong>
+        {% elif request.args.get('year') %}
+            年份：<strong>{{ request.args.get('year') }}</strong>
+        {% else %}
+            全部图片
+        {% endif %}
+    </span>
+    <span class="badge bg-primary">{{ total }} 张</span>
+</div>
+
+<div class="photo-grid" style="grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem;">
+    {% for img in images %}
+    <div class="photo-card card">
+        <a href="/image/{{ img.id }}" class="text-decoration-none">
+            <div class="thumbnail-container">
+                {% if img.thumbnail %}
+                <img src="data:image/jpeg;base64,{{ img.thumbnail }}" alt="{{ img.file_path }}" loading="lazy">
+                {% endif %}
+            </div>
+            <div class="card-body p-2">
+                <small class="text-muted d-block text-truncate">
+                    {{ img.captured_at[:10] if img.captured_at else '未知日期' }}
+                </small>
+                {% if img.category %}
+                <span class="badge bg-success" style="font-size: 0.7rem;">{{ img.category }}</span>
+                {% endif %}
+            </div>
+        </a>
+    </div>
+    {% endfor %}
+</div>
+
+<div class="mt-4 text-center">
+    <a href="/browse" class="btn btn-primary">
+        <i class="bi bi-filter"></i> 更多分类筛选
+    </a>
+</div>
+{% else %}
+<div class="alert alert-warning">
+    <i class="bi bi-exclamation-triangle"></i>
+    没有找到符合条件的图片。
+</div>
+<div class="text-center mt-4">
+    <a href="/browse" class="btn btn-primary btn-lg">
+        <i class="bi bi-grid-3x3-gap"></i> 浏览所有分类
+    </a>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // 点击图片卡片进入详情页
+    document.querySelectorAll('.photo-card').forEach(card => {
+        card.addEventListener('click', function(e) {
+            if (!e.target.closest('a')) {
+                const link = this.querySelector('a');
+                if (link) {
+                    window.location.href = link.href;
+                }
+            }
+        });
+    });
+</script>
+{% endblock %}

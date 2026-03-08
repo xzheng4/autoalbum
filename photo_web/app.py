@@ -231,6 +231,93 @@ def api_stats():
     })
 
 
+@app.route("/browse")
+def browse():
+    """浏览页面 - 左边分类导航，右边图片列表"""
+    # 获取所有分类统计
+    category_stats = db.get_category_stats()
+    location_stats = db.get_location_stats()
+    mood_stats = db.get_mood_stats()
+    object_stats = db.get_object_stats()
+    camera_stats = db.get_camera_stats()
+    year_stats = db.get_year_stats()
+    persons = db.get_all_persons()
+
+    # 获取人物图片数量
+    persons_data = []
+    for name in persons:
+        count = len(db.get_images_by_person(name))
+        persons_data.append({"name": name, "count": count})
+
+    return render_template("browse.html",
+                           category_stats=category_stats,
+                           location_stats=location_stats,
+                           mood_stats=mood_stats,
+                           object_stats=object_stats,
+                           camera_stats=camera_stats,
+                           year_stats=year_stats,
+                           persons=persons_data)
+
+
+@app.route("/images")
+def images_list():
+    """图片列表 API - 支持各种筛选"""
+    # 获取筛选参数
+    category = request.args.get("category", "")
+    mood = request.args.get("mood", "")
+    location = request.args.get("location", "")
+    person = request.args.get("person", "")
+    year = request.args.get("year", "")
+    obj = request.args.get("object", "")
+    limit = request.args.get("limit", 100, type=int)
+
+    images = []
+
+    if category:
+        images = db.get_images_by_category(category, limit)
+    elif mood:
+        images = db.get_images_by_mood(mood, limit)
+    elif location:
+        images = db.get_images_by_location_type(location, limit)
+    elif person:
+        images = db.get_images_by_person(person)
+    elif year:
+        with db.get_connection() as conn:
+            cursor = conn.execute("""
+                SELECT i.*, v.category
+                FROM images i
+                JOIN vl_analysis v ON i.id = v.image_id
+                WHERE strftime('%Y', i.captured_at) = ?
+                ORDER BY i.captured_at DESC
+                LIMIT ?
+            """, (year, limit))
+            images = [dict(row) for row in cursor.fetchall()]
+    else:
+        images = db.get_all_images(limit=limit)
+
+    # 生成缩略图
+    for img in images:
+        if os.path.exists(img['file_path']):
+            img['thumbnail'] = image_to_base64(img['file_path'])
+
+    return render_template("images.html", images=images, total=len(images))
+
+
+@app.route("/api/categories")
+def api_categories():
+    """API - 获取所有分类统计"""
+    return jsonify({
+        "categories": db.get_category_stats(),
+        "locations": db.get_location_stats(),
+        "moods": db.get_mood_stats(),
+        "objects": db.get_object_stats()[:10],
+        "cameras": db.get_camera_stats(),
+        "years": db.get_year_stats(),
+        "persons": [{"name": n, "count": len(db.get_images_by_person(n))}
+                    for n in db.get_all_persons()],
+    })
+
+
 @app.route("/api/search")
 def api_search():
     """API - 搜索"""

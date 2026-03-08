@@ -396,3 +396,138 @@ class Database:
                 "face_processed": row["face_done"] or 0,
                 "vl_processed": row["vl_done"] or 0,
             }
+
+    # ==================== 分类统计功能 ====================
+
+    def get_category_stats(self) -> List[Dict]:
+        """获取 VL 分类统计（按 category 字段）"""
+        with self.get_connection() as conn:
+            cursor = conn.execute("""
+                SELECT category, COUNT(*) as count
+                FROM vl_analysis
+                WHERE category IS NOT NULL AND category != ''
+                GROUP BY category
+                ORDER BY count DESC
+            """)
+            return [dict(row) for row in cursor.fetchall()]
+
+    def get_location_stats(self) -> Dict:
+        """获取拍摄地点统计（室内/户外，基于 category 字段）"""
+        with self.get_connection() as conn:
+            cursor = conn.execute("""
+                SELECT
+                    SUM(CASE WHEN category IN ('室内', 'home', 'indoor') THEN 1 ELSE 0 END) as indoor,
+                    SUM(CASE WHEN category IN ('户外', 'outdoor', 'nature', '旅游') THEN 1 ELSE 0 END) as outdoor
+                FROM vl_analysis
+            """)
+            row = cursor.fetchone()
+            return {
+                "indoor": row["indoor"] or 0,
+                "outdoor": row["outdoor"] or 0,
+            }
+
+    def get_mood_stats(self) -> List[Dict]:
+        """获取氛围统计"""
+        with self.get_connection() as conn:
+            cursor = conn.execute("""
+                SELECT mood, COUNT(*) as count
+                FROM vl_analysis
+                WHERE mood IS NOT NULL AND mood != ''
+                GROUP BY mood
+                ORDER BY count DESC
+                LIMIT 10
+            """)
+            return [dict(row) for row in cursor.fetchall()]
+
+    def get_object_stats(self) -> List[Dict]:
+        """获取常见物体统计（从 objects JSON 数组中提取）"""
+        with self.get_connection() as conn:
+            cursor = conn.execute("""
+                SELECT objects FROM vl_analysis
+                WHERE objects IS NOT NULL
+            """)
+            rows = cursor.fetchall()
+
+            # 解析 JSON 并统计物体
+            from collections import Counter
+            import json
+            object_counter = Counter()
+
+            for row in rows:
+                if row["objects"]:
+                    try:
+                        objects = json.loads(row["objects"])
+                        object_counter.update(objects)
+                    except:
+                        pass
+
+            return [{"object": obj, "count": cnt} for obj, cnt in object_counter.most_common(20)]
+
+    def get_camera_stats(self) -> List[Dict]:
+        """获取拍摄设备统计"""
+        with self.get_connection() as conn:
+            cursor = conn.execute("""
+                SELECT make, model, COUNT(*) as count
+                FROM exif_data
+                WHERE make IS NOT NULL
+                GROUP BY make, model
+                ORDER BY count DESC
+                LIMIT 10
+            """)
+            return [dict(row) for row in cursor.fetchall()]
+
+    def get_year_stats(self) -> List[Dict]:
+        """获取按年份统计的图片数量"""
+        with self.get_connection() as conn:
+            cursor = conn.execute("""
+                SELECT strftime('%Y', captured_at) as year, COUNT(*) as count
+                FROM images
+                WHERE captured_at IS NOT NULL
+                GROUP BY year
+                ORDER BY year DESC
+            """)
+            return [dict(row) for row in cursor.fetchall()]
+
+    def get_images_by_category(self, category: str, limit: int = 100) -> List[Dict]:
+        """按分类获取图片"""
+        with self.get_connection() as conn:
+            cursor = conn.execute("""
+                SELECT i.*, v.category, v.scene_description
+                FROM images i
+                JOIN vl_analysis v ON i.id = v.image_id
+                WHERE v.category = ?
+                ORDER BY i.captured_at DESC
+                LIMIT ?
+            """, (category, limit))
+            return [dict(row) for row in cursor.fetchall()]
+
+    def get_images_by_mood(self, mood: str, limit: int = 100) -> List[Dict]:
+        """按氛围获取图片"""
+        with self.get_connection() as conn:
+            cursor = conn.execute("""
+                SELECT i.*, v.mood
+                FROM images i
+                JOIN vl_analysis v ON i.id = v.image_id
+                WHERE v.mood = ?
+                ORDER BY i.captured_at DESC
+                LIMIT ?
+            """, (mood, limit))
+            return [dict(row) for row in cursor.fetchall()]
+
+    def get_images_by_location_type(self, location_type: str, limit: int = 100) -> List[Dict]:
+        """按地点类型（室内/户外）获取图片"""
+        if location_type == "indoor":
+            categories = "('室内', 'home', 'indoor')"
+        else:
+            categories = "('户外', 'outdoor', 'nature', '旅游')"
+
+        with self.get_connection() as conn:
+            cursor = conn.execute(f"""
+                SELECT i.*, v.category
+                FROM images i
+                JOIN vl_analysis v ON i.id = v.image_id
+                WHERE v.category IN {categories}
+                ORDER BY i.captured_at DESC
+                LIMIT ?
+            """, (limit,))
+            return [dict(row) for row in cursor.fetchall()]
