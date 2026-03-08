@@ -168,40 +168,43 @@ class VLAnalyzer:
         """
         处理一个 batch 的图片 - 使用 vLLM 批量并行推理
 
-        vLLM 0.16.0 的 llm.chat() 支持传入列表批量处理，
-        可以一次性并行处理多个请求，比逐个调用更高效。
+        vLLM 0.16.0 的 llm.chat() 支持传入多个对话进行批量处理，
+        每个对话是一个完整的消息列表。
         """
         results = [None] * len(image_paths)
 
         try:
-            # 为每个图片构建消息
-            messages_list = []
+            # 为每个图片构建一个完整的对话
+            all_messages = []
             valid_indices = []
 
             for idx, image_path in enumerate(image_paths):
                 try:
                     image_base64 = self._encode_image_to_base64(image_path)
-                    messages = {
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": self.ANALYSIS_PROMPT},
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:image/jpeg;base64,{image_base64}"
+                    # 每个图片是一个独立的对话，包含完整的消息历史
+                    conversation = [
+                        {
+                            "role": "user",
+                            "content": [
+                                {"type": "text", "text": self.ANALYSIS_PROMPT},
+                                {
+                                    "type": "image_url",
+                                    "image_url": {
+                                        "url": f"data:image/jpeg;base64,{image_base64}"
+                                    },
                                 },
-                            },
-                        ],
-                    }
-                    messages_list.append(messages)
+                            ],
+                        }
+                    ]
+                    all_messages.append(conversation)
                     valid_indices.append(idx)
                 except Exception as e:
                     print(f"Error preparing {image_path}: {e}")
 
-            if not messages_list:
+            if not all_messages:
                 return results
 
-            # 批量推理 - vLLM 0.16.0 支持传入列表一次性处理多个请求
+            # 批量推理 - vLLM 0.16.0 支持传入多个对话进行批量处理
             # 抑制 vLLM 的 "Adding requests" 和 "Processed prompts" 进度输出
             import sys
             import io
@@ -209,13 +212,14 @@ class VLAnalyzer:
             sys.stderr = io.StringIO()
             try:
                 outputs = self.llm.chat(
-                    messages=messages_list,
+                    messages=all_messages,
                     sampling_params=self.sampling_params,
                     use_tqdm=False
                 )
             finally:
                 sys.stderr = old_stderr
 
+            # vLLM 返回的输出顺序与输入对话顺序一一对应
             # 解析结果并映射回原始索引
             for i, output in enumerate(outputs):
                 try:
