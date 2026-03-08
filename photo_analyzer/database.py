@@ -480,11 +480,76 @@ class Database:
         """获取按年份统计的图片数量"""
         with self.get_connection() as conn:
             cursor = conn.execute("""
-                SELECT strftime('%Y', captured_at) as year, COUNT(*) as count
+                SELECT
+                    CASE
+                        WHEN captured_at IS NULL THEN '未知'
+                        WHEN strftime('%Y', captured_at) IS NULL THEN '未知'
+                        ELSE strftime('%Y', captured_at)
+                    END as year,
+                    COUNT(*) as count
                 FROM images
-                WHERE captured_at IS NOT NULL
                 GROUP BY year
-                ORDER BY year DESC
+                ORDER BY
+                    CASE WHEN year = '未知' THEN 1 ELSE 0 END,
+                    year DESC
+            """)
+            return [dict(row) for row in cursor.fetchall()]
+
+    def get_images_by_year(self, year: str, limit: int = 100) -> List[Dict]:
+        """按年份获取图片"""
+        if year == "未知":
+            query = """
+                SELECT i.*, v.category
+                FROM images i
+                LEFT JOIN vl_analysis v ON i.id = v.image_id
+                WHERE i.captured_at IS NULL OR strftime('%Y', i.captured_at) IS NULL
+                ORDER BY i.id DESC
+                LIMIT ?
+            """
+        else:
+            query = """
+                SELECT i.*, v.category
+                FROM images i
+                JOIN vl_analysis v ON i.id = v.image_id
+                WHERE strftime('%Y', i.captured_at) = ?
+                ORDER BY i.captured_at DESC
+                LIMIT ?
+            """
+        with self.get_connection() as conn:
+            cursor = conn.execute(query, (year,) if year != "未知" else (limit,))
+            return [dict(row) for row in cursor.fetchall()]
+
+    def get_person_stats_with_images(self) -> List[Dict]:
+        """获取人物统计及预览图片"""
+        with self.get_connection() as conn:
+            cursor = conn.execute("""
+                SELECT f.person_name, COUNT(DISTINCT f.image_id) as count
+                FROM faces f
+                GROUP BY f.person_name
+                ORDER BY count DESC
+            """)
+            persons = [dict(row) for row in cursor.fetchall()]
+
+        # 为每个人物获取一张预览图
+        for person in persons:
+            images = self.get_images_by_person(person["person_name"])
+            person["preview_image"] = images[0] if images else None
+            person["count"] = len(images)
+
+        return persons
+
+    def get_camera_stats_detailed(self) -> List[Dict]:
+        """获取拍摄设备统计（带预览图）"""
+        with self.get_connection() as conn:
+            cursor = conn.execute("""
+                SELECT e.make, e.model, COUNT(DISTINCT e.image_id) as count,
+                       (SELECT image_id FROM exif_data e2
+                        WHERE e2.make = e.make AND e2.model = e.model
+                        LIMIT 1) as sample_image_id
+                FROM exif_data e
+                WHERE e.make IS NOT NULL
+                GROUP BY e.make, e.model
+                ORDER BY count DESC
             """)
             return [dict(row) for row in cursor.fetchall()]
 

@@ -233,30 +233,63 @@ def api_stats():
 
 @app.route("/browse")
 def browse():
-    """浏览页面 - 左边分类导航，右边图片列表"""
-    # 获取所有分类统计
-    category_stats = db.get_category_stats()
-    location_stats = db.get_location_stats()
-    mood_stats = db.get_mood_stats()
-    object_stats = db.get_object_stats()
-    camera_stats = db.get_camera_stats()
-    year_stats = db.get_year_stats()
-    persons = db.get_all_persons()
+    """浏览页面 - 左边分类导航，右边照片集合"""
+    # 获取 5 大类分类数据
+    year_stats = db.get_year_stats()  # 按时间（年份）
+    persons_data = db.get_person_stats_with_images()  # 按人物
+    camera_stats = db.get_camera_stats_detailed()  # 按拍摄设备
+    location_stats = db.get_location_stats()  # 户外/室内
 
-    # 获取人物图片数量
-    persons_data = []
-    for name in persons:
-        count = len(db.get_images_by_person(name))
-        persons_data.append({"name": name, "count": count})
+    # 为每个年份获取预览图片（最多 12 张）
+    for year in year_stats:
+        images = db.get_images_by_year(year["year"], limit=12)
+        year["preview_images"] = []
+        for img in images:
+            if os.path.exists(img['file_path']):
+                img['thumbnail'] = image_to_base64(img['file_path'])
+                year["preview_images"].append(img)
+
+    # 为每个人物获取预览图片（最多 12 张）
+    for person in persons_data:
+        images = db.get_images_by_person(person["person_name"])[:12]
+        person["preview_images"] = []
+        for img in images:
+            if os.path.exists(img['file_path']):
+                img['thumbnail'] = image_to_base64(img['file_path'])
+                person["preview_images"].append(img)
+
+    # 为每个设备获取预览图片
+    for cam in camera_stats:
+        if cam["sample_image_id"]:
+            img = db.get_image_by_id(cam["sample_image_id"])
+            if img and os.path.exists(img['file_path']):
+                cam["preview_thumbnail"] = image_to_base64(img['file_path'])
+            else:
+                cam["preview_thumbnail"] = None
+        else:
+            cam["preview_thumbnail"] = None
+
+    # 获取户外/室内预览图片
+    outdoor_images = db.get_images_by_location_type("outdoor", limit=12)
+    indoor_images = db.get_images_by_location_type("indoor", limit=12)
+
+    location_stats["outdoor_preview"] = []
+    for img in outdoor_images:
+        if os.path.exists(img['file_path']):
+            img['thumbnail'] = image_to_base64(img['file_path'])
+            location_stats["outdoor_preview"].append(img)
+
+    location_stats["indoor_preview"] = []
+    for img in indoor_images:
+        if os.path.exists(img['file_path']):
+            img['thumbnail'] = image_to_base64(img['file_path'])
+            location_stats["indoor_preview"].append(img)
 
     return render_template("browse.html",
-                           category_stats=category_stats,
-                           location_stats=location_stats,
-                           mood_stats=mood_stats,
-                           object_stats=object_stats,
-                           camera_stats=camera_stats,
                            year_stats=year_stats,
-                           persons=persons_data)
+                           persons_data=persons_data,
+                           camera_stats=camera_stats,
+                           location_stats=location_stats)
 
 
 @app.route("/images")
