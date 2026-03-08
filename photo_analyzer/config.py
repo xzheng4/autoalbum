@@ -9,7 +9,7 @@ PROJECT_ROOT = Path(__file__).parent.parent
 
 # 数据目录
 DATA_DIR = PROJECT_ROOT / "data"
-PHOTOS_DIR = DATA_DIR / "photos"
+PHOTOS_DIR = Path("/mnt/nfs/photos")  # 默认照片库位置
 FACES_DIR = DATA_DIR / "faces"
 DATABASE_PATH = DATA_DIR / "autoalbum.db"
 
