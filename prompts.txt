@@ -100,6 +100,14 @@ analyze 命令每次中断后重启会重复处理所有图片，需要支持断
 - 添加 --force 参数用于强制刷新所有图片
 - analyze 命令跳过已完成阶段，从中断处继续处理
 
+### 指令 19: VL JSON 解析失败跳过
+当 VL 分析的 JSON 解析失败时，跳过该图片，不修改 vl_processed 状态，以便后续重试。
+
+### 指令 20: check_db.py 随机抽取功能
+给 tools/check_db.py 增加随机抽取功能：
+- --random 参数：从所有图片中随机抽取
+- --vl-json 参数：从已处理 VL 的图片中随机抽取并显示 JSON 数据
+
 ---
 
 ## 项目实现状态
@@ -115,21 +123,21 @@ analyze 命令每次中断后重启会重复处理所有图片，需要支持断
 - [x] HTML 模板（9 个页面）
 - [x] 推送到远程仓库
 - [x] .gitignore 排除 data/ 目录
-- [x] tools/check_db.py 数据库检查工具
+- [x] tools/check_db.py 数据库检查工具（支持 --first、--random、--vl-json）
 - [x] refresh-exif、refresh-faces 和 refresh-vl 命令
 - [x] 修复 face_encoding/face_embedding key 名称不匹配 bug
 - [x] 重构分析流程为三阶段独立处理
 - [x] 支持断点续传（三阶段独立标记）
+- [x] VL JSON 解析失败跳过机制
 
 ---
 
 ## 当前系统状态
 
 **数据库统计**:
-- 总图片数：195 张
-- 已处理：195 张
-- 家庭成员：7 人（外公、外婆、奶奶、妈妈、爸爸、郑丁涵、郑丁琳）
-- 人脸记录：509 条
+- 总图片数：19123 张
+- 已处理：13588 张
+- 家庭成员：8 人（外公、外婆、奶奶、妈妈、未知、爸爸、郑丁涵、郑丁琳）
 
 **模型配置**:
 - 人脸检测：insightface buffalo_l

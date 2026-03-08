@@ -172,6 +172,20 @@ autoalbum/
 # 查看最后 10 张图片的完整信息
 python tools/check_db.py
 
+# 查看最先 10 张图片
+python tools/check_db.py --first
+
+# 随机抽取 10 张图片
+python tools/check_db.py --random
+
+# 指定数量
+python tools/check_db.py --limit 20
+python tools/check_db.py --random --limit 20
+
+# 查看已处理 VL 分析的图片的 JSON 数据
+python tools/check_db.py --vl-json
+python tools/check_db.py --vl-json --limit 5
+
 # 清空人脸数据
 python tools/check_db.py --clear-faces
 
