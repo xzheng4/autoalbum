@@ -70,7 +70,7 @@ class EXIFExtractor:
                         elif tag == 'DateTimeOriginal':
                             # 格式：'YYYY:MM:DD HH:MM:SS' -> 'YYYY-MM-DD HH:MM:SS'
                             if value:
-                                result['captured_at'] = value.replace(':', '-', 2).replace(':', '-')
+                                result['captured_at'] = self._format_datetime(value)
                         elif tag == 'GPSInfo':
                             gps_data = self._parse_gps_info(value)
                             result.update(gps_data)
@@ -81,7 +81,7 @@ class EXIFExtractor:
                     with open(image_path, 'rb') as f:
                         tags = exifread.process_file(f, stop_tag='DateTimeOriginal')
                         if 'EXIF DateTimeOriginal' in tags:
-                            result['captured_at'] = str(tags['EXIF DateTimeOriginal'])
+                            result['captured_at'] = self._format_datetime(str(tags['EXIF DateTimeOriginal']))
                 except Exception:
                     pass
 
@@ -167,6 +167,30 @@ class EXIFExtractor:
             return float(value)
         except (ValueError, TypeError):
             return None
+
+    def _format_datetime(self, value: str) -> Optional[str]:
+        """
+        格式化 EXIF 日期时间字符串
+
+        输入格式：'YYYY:MM:DD HH:MM:SS' 或 'YYYY-MM-DD HH:MM:SS'
+        输出格式：'YYYY-MM-DD HH:MM:SS'
+        """
+        if not value:
+            return None
+
+        try:
+            # 替换日期部分的冒号为短横线
+            # 格式：'2023:05:15 14:30:45' -> '2023-05-15 14:30:45'
+            parts = value.split(' ')
+            if len(parts) == 2:
+                date_part = parts[0].replace(':', '-')
+                time_part = parts[1]  # 时间部分保持不变
+                return f"{date_part} {time_part}"
+            else:
+                # 如果没有空格分隔，尝试直接替换前两个冒号
+                return value.replace(':', '-', 2)
+        except Exception:
+            return value
 
     def _convert_to_degrees(self, value: tuple) -> float:
         """将 GPS 坐标转换为十进制度数"""
