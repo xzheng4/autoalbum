@@ -127,7 +127,7 @@ def print_image_info(image: dict, vl_analysis: dict, faces: list, exif: dict):
         print("\n[暂无 EXIF 信息]")
 
 
-def check_database(db_path: str = None, limit: int = 10, first: bool = False):
+def check_database(db_path: str = None, limit: int = 10, first: bool = False, random: bool = False):
     """
     检查数据库，抽取照片信息
 
@@ -135,6 +135,7 @@ def check_database(db_path: str = None, limit: int = 10, first: bool = False):
         db_path: 数据库路径
         limit: 抽取的图片数量
         first: 是否显示最早添加的图片（默认显示最后添加的）
+        random: 是否随机抽取
     """
     db_path = db_path or str(DATABASE_PATH)
 
@@ -158,8 +159,10 @@ def check_database(db_path: str = None, limit: int = 10, first: bool = False):
     print(f"  未处理：{total_count - processed_count}")
     print(f"  家庭成员：{len(persons)} 人 ({', '.join(persons) if persons else '无'})")
 
-    # 获取图片（最早或最后 N 张）
-    if first:
+    # 获取图片
+    if random:
+        images = db.get_random_images(limit=limit)
+    elif first:
         images = db.get_all_images(limit=limit, offset=0)
         # 反转顺序，按 ID 升序显示
         images = list(reversed(images))
@@ -170,7 +173,12 @@ def check_database(db_path: str = None, limit: int = 10, first: bool = False):
         print("\n数据库中没有图片记录")
         return
 
-    label = "最早" if first else "最后"
+    if random:
+        label = "随机"
+    elif first:
+        label = "最早"
+    else:
+        label = "最后"
     print(f"\n正在显示{label} {len(images)} 张图片的详细信息...")
 
     for image in images:
@@ -186,7 +194,12 @@ def check_database(db_path: str = None, limit: int = 10, first: bool = False):
 
     # 打印总结
     print_separator("检查完成")
-    label = "最早" if first else "最后"
+    if random:
+        label = "随机抽取"
+    elif first:
+        label = "最早"
+    else:
+        label = "最后"
     print(f"已显示数据库中{label} {len(images)} 张图片的完整信息")
     print(f"总共有 {total_count} 张图片")
 
@@ -318,6 +331,8 @@ def main():
                         help="要检查的图片数量（默认 10）")
     parser.add_argument("--first", action="store_true",
                         help="显示最先添加的图片（默认显示最后添加的）")
+    parser.add_argument("--random", action="store_true",
+                        help="随机抽取图片")
 
     # 清空数据选项
     clear_group = parser.add_argument_group("清空数据选项")
@@ -341,7 +356,7 @@ def main():
         clear_vl_analysis(db_path=args.db, confirm=args.yes)
     else:
         # 默认检查数据库
-        check_database(db_path=args.db, limit=args.limit, first=args.first)
+        check_database(db_path=args.db, limit=args.limit, first=args.first, random=args.random)
 
 
 if __name__ == "__main__":

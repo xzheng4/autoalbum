@@ -120,6 +120,13 @@ class Database:
             cursor = conn.execute(query)
             return [dict(row) for row in cursor.fetchall()]
 
+    def get_random_images(self, limit: int = 10) -> List[Dict]:
+        """随机获取指定数量的图片"""
+        query = "SELECT * FROM images ORDER BY RANDOM() LIMIT ?"
+        with self.get_connection() as conn:
+            cursor = conn.execute(query, (limit,))
+            return [dict(row) for row in cursor.fetchall()]
+
     def mark_processed(self, image_id: int):
         """标记图片为已处理（所有阶段）"""
         with self.get_connection() as conn:
