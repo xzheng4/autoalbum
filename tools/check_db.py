@@ -47,7 +47,17 @@ def print_image_info(image: dict, vl_analysis: dict, faces: list, exif: dict):
     if image.get('file_hash'):
         print(f"文件哈希：{image['file_hash'][:16]}...")
 
-    print(f"处理状态：{'已处理' if image.get('processed') else '未处理'}")
+    # 处理状态（检查三个阶段的标志）
+    exif_done = image.get('exif_processed', False)
+    face_done = image.get('face_processed', False)
+    vl_done = image.get('vl_processed', False)
+    if exif_done and face_done and vl_done:
+        status = "已完成"
+    elif exif_done or face_done or vl_done:
+        status = f"部分完成 (EXIF:{'√' if exif_done else '×'}, Face:{'√' if face_done else '×'}, VL:{'√' if vl_done else '×'})"
+    else:
+        status = "未处理"
+    print(f"处理状态：{status}")
 
     # VL 分析结果
     if vl_analysis:
@@ -117,13 +127,14 @@ def print_image_info(image: dict, vl_analysis: dict, faces: list, exif: dict):
         print("\n[暂无 EXIF 信息]")
 
 
-def check_database(db_path: str = None, limit: int = 10):
+def check_database(db_path: str = None, limit: int = 10, first: bool = False):
     """
-    检查数据库，抽取最后处理的照片信息
+    检查数据库，抽取照片信息
 
     Args:
         db_path: 数据库路径
         limit: 抽取的图片数量
+        first: 是否显示最早添加的图片（默认显示最后添加的）
     """
     db_path = db_path or str(DATABASE_PATH)
 
@@ -147,14 +158,20 @@ def check_database(db_path: str = None, limit: int = 10):
     print(f"  未处理：{total_count - processed_count}")
     print(f"  家庭成员：{len(persons)} 人 ({', '.join(persons) if persons else '无'})")
 
-    # 获取最后 N 张图片
-    images = db.get_all_images(limit=limit)
+    # 获取图片（最早或最后 N 张）
+    if first:
+        images = db.get_all_images(limit=limit, offset=0)
+        # 反转顺序，按 ID 升序显示
+        images = list(reversed(images))
+    else:
+        images = db.get_all_images(limit=limit)
 
     if not images:
         print("\n数据库中没有图片记录")
         return
 
-    print(f"\n正在显示最后 {len(images)} 张图片的详细信息...")
+    label = "最早" if first else "最后"
+    print(f"\n正在显示{label} {len(images)} 张图片的详细信息...")
 
     for image in images:
         image_id = image['id']
@@ -169,7 +186,8 @@ def check_database(db_path: str = None, limit: int = 10):
 
     # 打印总结
     print_separator("检查完成")
-    print(f"已显示数据库中最后 {len(images)} 张图片的完整信息")
+    label = "最早" if first else "最后"
+    print(f"已显示数据库中{label} {len(images)} 张图片的完整信息")
     print(f"总共有 {total_count} 张图片")
 
 
@@ -298,6 +316,8 @@ def main():
     parser.add_argument("--db", type=str, help="数据库路径")
     parser.add_argument("--limit", type=int, default=10,
                         help="要检查的图片数量（默认 10）")
+    parser.add_argument("--first", action="store_true",
+                        help="显示最先添加的图片（默认显示最后添加的）")
 
     # 清空数据选项
     clear_group = parser.add_argument_group("清空数据选项")
@@ -321,7 +341,7 @@ def main():
         clear_vl_analysis(db_path=args.db, confirm=args.yes)
     else:
         # 默认检查数据库
-        check_database(db_path=args.db, limit=args.limit)
+        check_database(db_path=args.db, limit=args.limit, first=args.first)
 
 
 if __name__ == "__main__":
