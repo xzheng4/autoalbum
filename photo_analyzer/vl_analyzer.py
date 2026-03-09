@@ -4,6 +4,7 @@ Qwen3-VL 统一分析模块
 """
 import os
 import json
+import re
 import base64
 from typing import List, Dict, Optional, Any
 from pathlib import Path
@@ -30,6 +31,9 @@ class VLAnalyzer:
 4. **物体**: 列出图片中可见的主要物体/人物
 5. **氛围**: 描述图片的整体氛围（快乐、正式、休闲、怀旧等）
 6. **置信度**: 你对本次分析的置信度（0.0-1.0）
+
+**重要限制**：
+- `ocr_text` 字段的长度请限制在 1024 tokens 以内。如果图片中的文字内容超过此限制，请截取最重要的前 1024 tokens。
 
 请仅输出一个有效的 JSON 对象，格式如下：
 {
@@ -247,81 +251,216 @@ class VLAnalyzer:
                 content = content[:-3]
             content = content.strip()
 
-            # 尝试修复常见的 JSON 格式问题
-            # 1. 替换未转义的双引号（在字符串值中的）
-            # 2. 替换换行符为空格
-            content = content.replace('\n', ' ').replace('\r', '')
-
-            # 解析 JSON
+            # 直接尝试解析（如果模型返回的是有效 JSON）
             result = json.loads(content)
-
-            # 确保所有字段存在
-            return {
-                "ocr_text": result.get("ocr_text", ""),
-                "scene_description": result.get("scene_description", ""),
-                "category": result.get("category", "other"),
-                "objects": result.get("objects", []),
-                "mood": result.get("mood", ""),
-                "confidence": float(result.get("confidence", 0.5)),
-            }
+            return self._validate_and_normalize_result(result)
 
         except Exception as e:
-            # 尝试使用更宽松的方式解析
-            try:
-                # 尝试提取 JSON 部分（如果响应包含额外文本）
-                import re
-                json_match = re.search(r'\{.*\}', content, re.DOTALL)
-                if json_match:
-                    json_str = json_match.group(0)
-                    # 尝试修复常见的字符串问题
-                    json_str = self._fix_json_string(json_str)
-                    result = json.loads(json_str)
-                    return {
-                        "ocr_text": result.get("ocr_text", ""),
-                        "scene_description": result.get("scene_description", ""),
-                        "category": result.get("category", "other"),
-                        "objects": result.get("objects", []),
-                        "mood": result.get("mood", ""),
-                        "confidence": float(result.get("confidence", 0.5)),
-                    }
-            except:
-                pass
+            # 解析失败，尝试各种修复策略
+            return self._try_parse_with_fallbacks(content, e)
 
-            # JSON 解析失败，返回 None 表示需要跳过该图片
-            print(f"Error parsing response JSON: {e}")
-            print(f"Raw content: {content[:200]}...")
-            return None
+    def _validate_and_normalize_result(self, result: dict) -> Optional[Dict[str, Any]]:
+        """验证并标准化解析结果"""
+        return {
+            "ocr_text": result.get("ocr_text", ""),
+            "scene_description": result.get("scene_description", ""),
+            "category": result.get("category", "other"),
+            "objects": result.get("objects", []),
+            "mood": result.get("mood", ""),
+            "confidence": float(result.get("confidence", 0.5)),
+        }
+
+    def _try_parse_with_fallbacks(self, content: str, original_error: Exception) -> Optional[Dict[str, Any]]:
+        """
+        使用多种回退策略解析 JSON
+
+        策略 1: 修复换行符等控制字符后尝试标准解析
+        策略 2: 使用健壮的字段级提取（针对 OCR 内容破坏 JSON 的情况）
+        策略 3: 提取短字段（category, confidence 等），OCR 文本使用启发式方法
+        """
+        # 策略 1: 尝试提取 JSON 块并修复控制字符
+        try:
+            json_match = re.search(r'\{.*\}', content, re.DOTALL)
+            if json_match:
+                json_str = json_match.group(0)
+                json_str = self._fix_json_string(json_str)
+                result = json.loads(json_str)
+                return self._validate_and_normalize_result(result)
+        except Exception as e1:
+            pass
+
+        # 策略 2: 提取短字段，然后对 ocr_text 使用特殊处理
+        try:
+            result = self._extract_fields_robust(content)
+            if result:
+                print(f"Recovered result using robust field extraction")
+                return self._validate_and_normalize_result(result)
+        except Exception as e2:
+            print(f"Robust field extraction failed: {e2}")
+
+        # 所有策略都失败了
+        print(f"Error parsing response JSON: {original_error}")
+        print(f"Raw content (truncated): {content[:500]}...")
+        return None
+
+    def _extract_fields_robust(self, content: str) -> Optional[Dict[str, Any]]:
+        """
+        健壮的字段提取 - 专门处理 OCR 内容破坏 JSON 结构的情况
+
+        策略：
+        1. 首先提取简单的短字段（confidence, category, mood, objects）
+        2. 然后找到 "scene_description" 字段的位置
+        3. ocr_text 是从 "ocr_text": 到 "scene_description": 之间的内容
+        """
+        result = {
+            "ocr_text": "",
+            "scene_description": "",
+            "category": "other",
+            "objects": [],
+            "mood": "",
+            "confidence": 0.5,
+        }
+
+        # 1. 提取 confidence（数字，最可靠）
+        conf_match = re.search(r'"confidence"\s*:\s*([\d.]+)', content)
+        if conf_match:
+            result["confidence"] = float(conf_match.group(1))
+
+        # 2. 提取 objects（数组）
+        objects_match = re.search(r'"objects"\s*:\s*\[([^\]]*)\]', content)
+        if objects_match:
+            arr_content = objects_match.group(1)
+            result["objects"] = re.findall(r'"([^"]*)"', arr_content)
+
+        # 3. 提取 category（短字符串）
+        cat_match = re.search(r'"category"\s*:\s*"([^"]+)"', content)
+        if cat_match:
+            result["category"] = cat_match.group(1)
+
+        # 4. 提取 mood（短字符串）
+        mood_match = re.search(r'"mood"\s*:\s*"([^"]+)"', content)
+        if mood_match:
+            result["mood"] = mood_match.group(1)
+
+        # 5. 找到 scene_description 的起始位置
+        scene_match = re.search(r'"scene_description"\s*:\s*"', content)
+        scene_start = scene_match.end() if scene_match else None
+
+        if scene_start:
+            # 提取 scene_description 的值（找到下一个字段或结尾）
+            next_field_patterns = [
+                r'"\s*,\s*"category"\s*:',
+                r'"\s*,\s*"objects"\s*:',
+                r'"\s*,\s*"mood"\s*:',
+                r'"\s*,\s*"confidence"\s*:',
+            ]
+            end_pos = len(content)
+            for pattern in next_field_patterns:
+                match = re.search(pattern, content)
+                if match and match.start() > scene_start and match.start() < end_pos:
+                    end_pos = match.start()
+
+            scene_raw = content[scene_start:end_pos].rstrip()
+            while scene_raw and scene_raw[-1] in '"\',:':
+                scene_raw = scene_raw[:-1].rstrip()
+
+            if scene_raw:
+                try:
+                    result["scene_description"] = json.loads('"' + scene_raw + '"')
+                except:
+                    escaped = scene_raw.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n')
+                    try:
+                        result["scene_description"] = json.loads('"' + escaped + '"')
+                    except:
+                        result["scene_description"] = scene_raw
+
+        # 6. 提取 ocr_text：从 "ocr_text": 到 "scene_description": 之前
+        ocr_start_match = re.search(r'"ocr_text"\s*:\s*"', content)
+        if ocr_start_match and scene_match:
+            start_pos = ocr_start_match.end()
+            end_pos = scene_match.start()  # scene_description 字段的开始位置
+
+            ocr_raw = content[start_pos:end_pos].rstrip()
+
+            # 清理末尾（可能是前一个字段的结束标记）
+            # 查找最后一个 " 的位置，它应该是前一个字段值的结束
+            # 但由于 ocr_text 可能包含未转义的 "，我们需要更聪明的方法
+
+            # 策略：从后往前找第一个后面跟 :\s*"scene 的 "
+            # 这通常标志着 scene_description 字段的开始
+            # 所以 ocr_raw 的末尾应该清理掉不属于 OCR 内容的部分
+
+            # 简化处理：直接清理末尾的特殊字符
+            while ocr_raw and ocr_raw[-1] in '"\\n\\r\\t,':
+                ocr_raw = ocr_raw[:-1]
+
+            ocr_raw = ocr_raw.strip()
+
+            # 尝试解析
+            if ocr_raw:
+                # 首先尝试直接解析
+                try:
+                    result["ocr_text"] = json.loads('"' + ocr_raw + '"')
+                except:
+                    # 手动转义
+                    escaped = ocr_raw.replace('\\\\', '\\\\\\\\').replace('"', '\\\\"').replace('\\n', '\\\\n').replace('\n', '\\n').replace('\r', '\\r').replace('\t', '\\t')
+                    try:
+                        result["ocr_text"] = json.loads('"' + escaped + '"')
+                    except:
+                        result["ocr_text"] = ocr_raw
+
+        return result
 
     def _fix_json_string(self, json_str: str) -> str:
         """
-        修复常见的 JSON 字符串问题
+        修复 JSON 字符串中的转义问题
 
-        Args:
-            json_str: 可能有问题的 JSON 字符串
-
-        Returns:
-            修复后的 JSON 字符串
+        使用状态机逐字符扫描，正确处理字符串内的特殊字符。
+        关键：只转义字符串值内部的特殊字符，不修改 JSON 结构。
         """
-        # 移除字符串值中的未转义换行符
+        result = []
+        i = 0
         in_string = False
         escape_next = False
-        result = []
 
-        for char in json_str:
+        while i < len(json_str):
+            char = json_str[i]
+
+            # 处理转义序列
             if escape_next:
                 result.append(char)
                 escape_next = False
-            elif char == '\\':
+                i += 1
+                continue
+
+            # 处理反斜杠（在字符串内）
+            if char == '\\' and in_string:
                 result.append(char)
                 escape_next = True
-            elif char == '"' and not escape_next:
+                i += 1
+                continue
+
+            # 处理双引号（切换字符串状态）
+            if char == '"':
                 in_string = not in_string
                 result.append(char)
-            elif char in '\n\r' and in_string:
-                # 在字符串中的换行符替换为空格
-                result.append(' ')
+                i += 1
+                continue
+
+            # 在字符串内部，需要转义特殊字符
+            if in_string:
+                if char == '\n':
+                    result.append('\\n')
+                elif char == '\r':
+                    result.append('\\r')
+                elif char == '\t':
+                    result.append('\\t')
+                else:
+                    result.append(char)
             else:
                 result.append(char)
+
+            i += 1
 
         return ''.join(result)
 

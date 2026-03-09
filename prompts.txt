@@ -108,6 +108,17 @@ analyze 命令每次中断后重启会重复处理所有图片，需要支持断
 - --random 参数：从所有图片中随机抽取
 - --vl-json 参数：从已处理 VL 的图片中随机抽取并显示 JSON 数据
 
+### 指令 21: 修复 VL JSON 解析 - 长 OCR 内容处理
+修复当 OCR 内容较长时 JSON 格式易被破坏的问题（"Unterminated string starting" 错误）。
+要求对可能有 OCR 内容的输出使用 json.dumps() 进行转义，并加强验证逻辑。
+- 添加 `_fix_json_string` 方法逐字符扫描并转义控制字符
+- 添加 `_extract_fields_robust` 方法从破损 JSON 中提取字段
+- 使用多层回退策略解析模型输出
+
+### 指令 22: 限制 OCR 文本长度
+在 ANALYSIS_PROMPT 中添加要求，限制 `ocr_text` 字段最大长度为 1024 tokens。
+如果图片中文字内容超过限制，截取最重要的前 1024 tokens。
+
 ---
 
 ## 项目实现状态
@@ -129,6 +140,8 @@ analyze 命令每次中断后重启会重复处理所有图片，需要支持断
 - [x] 重构分析流程为三阶段独立处理
 - [x] 支持断点续传（三阶段独立标记）
 - [x] VL JSON 解析失败跳过机制
+- [x] VL JSON 解析修复 - 长 OCR 内容处理（多层回退策略）
+- [x] OCR 文本长度限制（1024 tokens）
 
 ---
 
