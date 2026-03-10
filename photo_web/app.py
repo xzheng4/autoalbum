@@ -294,7 +294,7 @@ def browse():
 
 @app.route("/images")
 def images_list():
-    """图片列表 API - 支持各种筛选"""
+    """图片列表 API - 支持各种筛选和分页"""
     # 获取筛选参数
     category = request.args.get("category", "")
     mood = request.args.get("mood", "")
@@ -303,20 +303,28 @@ def images_list():
     year = request.args.get("year", "")
     camera = request.args.get("camera", "")
     obj = request.args.get("object", "")
-    limit = request.args.get("limit", 100, type=int)
+    limit = request.args.get("limit", app.config["THUMBNAILS_PER_PAGE"], type=int)
+    page = request.args.get("page", 1, type=int)
+    offset = (page - 1) * limit
 
     images = []
+    total = 0
 
     if category:
-        images = db.get_images_by_category(category, limit)
+        images = db.get_images_by_category(category, limit, offset)
+        total = db.get_count_by_category(category)
     elif mood:
-        images = db.get_images_by_mood(mood, limit)
+        images = db.get_images_by_mood(mood, limit, offset)
+        total = db.get_count_by_mood(mood)
     elif location:
-        images = db.get_images_by_location_type(location, limit)
+        images = db.get_images_by_location_type(location, limit, offset)
+        total = db.get_count_by_location_type(location)
     elif person:
-        images = db.get_images_by_person(person)
+        images = db.get_images_by_person(person, limit, offset)
+        total = db.get_count_by_person(person)
     elif year:
-        images = db.get_images_by_year(year, limit)
+        images = db.get_images_by_year(year, limit, offset)
+        total = db.get_count_by_year(year)
     elif camera:
         # camera 参数格式："make+model" 或 "make"
         from urllib.parse import unquote
@@ -324,16 +332,25 @@ def images_list():
         parts = camera_unquoted.split(" ", 1)
         make = parts[0]
         model = parts[1] if len(parts) > 1 else None
-        images = db.get_images_by_camera(make, model, limit)
+        images = db.get_images_by_camera(make, model, limit, offset)
+        total = db.get_count_by_camera(make, model)
     else:
-        images = db.get_all_images(limit=limit)
+        images = db.get_all_images(limit=limit, offset=offset)
+        total = db.get_image_count()
 
     # 生成缩略图
     for img in images:
         if os.path.exists(img['file_path']):
             img['thumbnail'] = image_to_base64(img['file_path'])
 
-    return render_template("images.html", images=images, total=len(images))
+    total_pages = (total + limit - 1) // limit if total > 0 else 0
+
+    return render_template("images.html",
+                           images=images,
+                           total=total,
+                           page=page,
+                           total_pages=total_pages,
+                           limit=limit)
 
 
 @app.route("/api/categories")
@@ -363,6 +380,81 @@ def api_search():
         "ocr_text": r.get('ocr_text', ''),
         "category": r.get('category', ''),
     } for r in results])
+
+
+@app.route("/api/images")
+def api_images_list():
+    """API - 图片列表（JSON 格式，支持分页和筛选）"""
+    # 获取筛选参数
+    category = request.args.get("category", "")
+    mood = request.args.get("mood", "")
+    location = request.args.get("location", "")
+    person = request.args.get("person", "")
+    year = request.args.get("year", "")
+    camera = request.args.get("camera", "")
+    limit = request.args.get("limit", app.config["THUMBNAILS_PER_PAGE"], type=int)
+    page = request.args.get("page", 1, type=int)
+    offset = (page - 1) * limit
+
+    images = []
+    total = 0
+
+    if category:
+        images = db.get_images_by_category(category, limit, offset)
+        total = db.get_count_by_category(category)
+    elif mood:
+        images = db.get_images_by_mood(mood, limit, offset)
+        total = db.get_count_by_mood(mood)
+    elif location:
+        images = db.get_images_by_location_type(location, limit, offset)
+        total = db.get_count_by_location_type(location)
+    elif person:
+        images = db.get_images_by_person(person, limit, offset)
+        total = db.get_count_by_person(person)
+    elif year:
+        images = db.get_images_by_year(year, limit, offset)
+        total = db.get_count_by_year(year)
+    elif camera:
+        from urllib.parse import unquote
+        camera_unquoted = unquote(camera.replace("+", " "))
+        parts = camera_unquoted.split(" ", 1)
+        make = parts[0]
+        model = parts[1] if len(parts) > 1 else None
+        images = db.get_images_by_camera(make, model, limit, offset)
+        total = db.get_count_by_camera(make, model)
+    else:
+        images = db.get_all_images(limit=limit, offset=offset)
+        total = db.get_image_count()
+
+    # 生成缩略图
+    result = []
+    for img in images:
+        if os.path.exists(img['file_path']):
+            result.append({
+                'id': img['id'],
+                'file_path': img['file_path'],
+                'captured_at': img.get('captured_at', ''),
+                'category': img.get('category', ''),
+                'thumbnail': image_to_base64(img['file_path'])
+            })
+        else:
+            result.append({
+                'id': img['id'],
+                'file_path': img['file_path'],
+                'captured_at': img.get('captured_at', ''),
+                'category': img.get('category', ''),
+                'thumbnail': ''
+            })
+
+    total_pages = (total + limit - 1) // limit if total > 0 else 0
+
+    return jsonify({
+        "images": result,
+        "page": page,
+        "total": total,
+        "total_pages": total_pages,
+        "has_next": page < total_pages
+    })
 
 
 # 错误页面

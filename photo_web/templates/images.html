@@ -37,7 +37,34 @@
     <span class="badge bg-primary">{{ total }} 张</span>
 </div>
 
-<div class="photo-grid" style="grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem;">
+<!-- 分页导航 -->
+{% if total_pages > 1 %}
+<nav aria-label="Page navigation" class="mb-3">
+    <ul class="pagination justify-content-center" id="pagination">
+        <li class="page-item {% if page <= 1 %}disabled{% endif %}">
+            <a class="page-link" href="#" data-page="{{ page - 1 }}">
+                <i class="bi bi-chevron-left"></i> 上一页
+            </a>
+        </li>
+        {% for p in range(1, total_pages + 1) %}
+            {% if p == page %}
+                <li class="page-item active"><span class="page-link">{{ p }}</span></li>
+            {% elif p >= page - 2 and p <= page + 2 %}
+                <li class="page-item"><a class="page-link" href="#" data-page="{{ p }}">{{ p }}</a></li>
+            {% elif p == 1 or p == total_pages %}
+                <li class="page-item"><a class="page-link" href="#" data-page="{{ p }}">{{ p }}</a></li>
+            {% endif %}
+        {% endfor %}
+        <li class="page-item {% if page >= total_pages %}disabled{% endif %}">
+            <a class="page-link" href="#" data-page="{{ page + 1 }}">
+                下一页 <i class="bi bi-chevron-right"></i>
+            </a>
+        </li>
+    </ul>
+</nav>
+{% endif %}
+
+<div class="photo-grid" style="grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem;" id="photoGrid">
     {% for img in images %}
     <div class="photo-card card">
         <a href="/image/{{ img.id }}" class="text-decoration-none">
@@ -58,6 +85,15 @@
     </div>
     {% endfor %}
 </div>
+
+<!-- 加载更多按钮 -->
+{% if page < total_pages %}
+<div class="mt-4 text-center">
+    <button id="loadMoreBtn" class="btn btn-outline-primary btn-lg" data-next-page="{{ page + 1 }}">
+        <i class="bi bi-plus-circle"></i> 加载更多
+    </button>
+</div>
+{% endif %}
 
 <div class="mt-4 text-center">
     <a href="/browse" class="btn btn-primary">
@@ -90,5 +126,92 @@
             }
         });
     });
+
+    // 分页导航
+    document.querySelectorAll('.page-link').forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            const page = this.getAttribute('data-page');
+            if (page) {
+                const url = new URL(window.location.href);
+                url.searchParams.set('page', page);
+                window.location.href = url.toString();
+            }
+        });
+    });
+
+    // 加载更多功能
+    const loadMoreBtn = document.getElementById('loadMoreBtn');
+    if (loadMoreBtn) {
+        loadMoreBtn.addEventListener('click', async function() {
+            const nextPage = this.getAttribute('data-next-page');
+            const currentFilter = getCurrentFilter();
+
+            try {
+                this.disabled = true;
+                this.innerHTML = '<i class="bi bi-hourglass-split"></i> 加载中...';
+
+                const response = await fetch(`/api/images?page=${nextPage}&${currentFilter}`);
+                const data = await response.json();
+
+                if (data.images && data.images.length > 0) {
+                    const photoGrid = document.getElementById('photoGrid');
+                    data.images.forEach(img => {
+                        const card = createPhotoCard(img);
+                        photoGrid.appendChild(card);
+                    });
+
+                    // 更新加载更多按钮
+                    if (data.has_next) {
+                        this.setAttribute('data-next-page', parseInt(nextPage) + 1);
+                        this.disabled = false;
+                        this.innerHTML = '<i class="bi bi-plus-circle"></i> 加载更多';
+                    } else {
+                        this.remove();
+                    }
+                }
+            } catch (error) {
+                console.error('加载失败:', error);
+                alert('加载更多图片失败，请重试');
+                this.disabled = false;
+                this.innerHTML = '<i class="bi bi-plus-circle"></i> 加载更多';
+            }
+        });
+    }
+
+    // 获取当前筛选条件
+    function getCurrentFilter() {
+        const params = new URLSearchParams(window.location.search);
+        const filters = ['category', 'mood', 'location', 'person', 'year', 'camera', 'limit'];
+        const result = [];
+
+        filters.forEach(f => {
+            if (params.has(f)) {
+                result.push(`${f}=${params.get(f)}`);
+            }
+        });
+
+        return result.join('&') || 'limit=48';
+    }
+
+    // 创建图片卡片
+    function createPhotoCard(img) {
+        const div = document.createElement('div');
+        div.className = 'photo-card card';
+        div.innerHTML = `
+            <a href="/image/${img.id}" class="text-decoration-none">
+                <div class="thumbnail-container">
+                    ${img.thumbnail ? `<img src="data:image/jpeg;base64,${img.thumbnail}" alt="${img.file_path}" loading="lazy">` : ''}
+                </div>
+                <div class="card-body p-2">
+                    <small class="text-muted d-block text-truncate">
+                        ${img.captured_at ? img.captured_at.substring(0, 10) : '未知日期'}
+                    </small>
+                    ${img.category ? `<span class="badge bg-success" style="font-size: 0.7rem;">${img.category}</span>` : ''}
+                </div>
+            </a>
+        `;
+        return div;
+    }
 </script>
 {% endblock %}

@@ -271,15 +271,24 @@ class Database:
             )
             return [dict(row) for row in cursor.fetchall()]
 
-    def get_images_by_person(self, person_name: str) -> List[Dict]:
+    def get_images_by_person(self, person_name: str, limit: int = None, offset: int = 0) -> List[Dict]:
         """获取某人的所有图片"""
         with self.get_connection() as conn:
-            cursor = conn.execute("""
-                SELECT DISTINCT i.* FROM images i
-                JOIN faces f ON i.id = f.image_id
-                WHERE f.person_name = ?
-                ORDER BY i.captured_at DESC
-            """, (person_name,))
+            if limit:
+                cursor = conn.execute("""
+                    SELECT DISTINCT i.* FROM images i
+                    JOIN faces f ON i.id = f.image_id
+                    WHERE f.person_name = ?
+                    ORDER BY i.captured_at DESC
+                    LIMIT ? OFFSET ?
+                """, (person_name, limit, offset))
+            else:
+                cursor = conn.execute("""
+                    SELECT DISTINCT i.* FROM images i
+                    JOIN faces f ON i.id = f.image_id
+                    WHERE f.person_name = ?
+                    ORDER BY i.captured_at DESC
+                """, (person_name,))
             return [dict(row) for row in cursor.fetchall()]
 
     def get_all_persons(self) -> List[str]:
@@ -290,7 +299,7 @@ class Database:
             )
             return [row[0] for row in cursor.fetchall()]
 
-    def get_images_by_camera(self, make: str, model: str = None, limit: int = 100) -> List[Dict]:
+    def get_images_by_camera(self, make: str, model: str = None, limit: int = 100, offset: int = 0) -> List[Dict]:
         """按拍摄设备获取图片"""
         with self.get_connection() as conn:
             if model:
@@ -299,18 +308,18 @@ class Database:
                     JOIN exif_data e ON i.id = e.image_id
                     WHERE e.make = ? AND e.model = ?
                     ORDER BY i.captured_at DESC
-                    LIMIT ?
+                    LIMIT ? OFFSET ?
                 """
-                params = (make, model, limit)
+                params = (make, model, limit, offset)
             else:
                 query = """
                     SELECT DISTINCT i.* FROM images i
                     JOIN exif_data e ON i.id = e.image_id
                     WHERE e.make = ?
                     ORDER BY i.captured_at DESC
-                    LIMIT ?
+                    LIMIT ? OFFSET ?
                 """
-                params = (make, limit)
+                params = (make, limit, offset)
             cursor = conn.execute(query, params)
             return [dict(row) for row in cursor.fetchall()]
 
@@ -520,7 +529,7 @@ class Database:
             """)
             return [dict(row) for row in cursor.fetchall()]
 
-    def get_images_by_year(self, year: str, limit: int = 100) -> List[Dict]:
+    def get_images_by_year(self, year: str, limit: int = 100, offset: int = 0) -> List[Dict]:
         """按年份获取图片（基于 images.captured_at）"""
         if year == "未知":
             query = """
@@ -531,9 +540,9 @@ class Database:
                    OR i.captured_at = ''
                    OR strftime('%Y', i.captured_at) IS NULL
                 ORDER BY i.id DESC
-                LIMIT ?
+                LIMIT ? OFFSET ?
             """
-            params = (limit,)
+            params = (limit, offset)
         else:
             query = """
                 SELECT i.*, v.category
@@ -541,9 +550,9 @@ class Database:
                 LEFT JOIN vl_analysis v ON i.id = v.image_id
                 WHERE strftime('%Y', i.captured_at) = ?
                 ORDER BY i.captured_at DESC
-                LIMIT ?
+                LIMIT ? OFFSET ?
             """
-            params = (year, limit)
+            params = (year, limit, offset)
 
         with self.get_connection() as conn:
             cursor = conn.execute(query, params)
@@ -583,7 +592,7 @@ class Database:
             """)
             return [dict(row) for row in cursor.fetchall()]
 
-    def get_images_by_category(self, category: str, limit: int = 100) -> List[Dict]:
+    def get_images_by_category(self, category: str, limit: int = 100, offset: int = 0) -> List[Dict]:
         """按分类获取图片"""
         with self.get_connection() as conn:
             cursor = conn.execute("""
@@ -592,11 +601,11 @@ class Database:
                 JOIN vl_analysis v ON i.id = v.image_id
                 WHERE v.category = ?
                 ORDER BY i.captured_at DESC
-                LIMIT ?
-            """, (category, limit))
+                LIMIT ? OFFSET ?
+            """, (category, limit, offset))
             return [dict(row) for row in cursor.fetchall()]
 
-    def get_images_by_mood(self, mood: str, limit: int = 100) -> List[Dict]:
+    def get_images_by_mood(self, mood: str, limit: int = 100, offset: int = 0) -> List[Dict]:
         """按氛围获取图片"""
         with self.get_connection() as conn:
             cursor = conn.execute("""
@@ -605,11 +614,11 @@ class Database:
                 JOIN vl_analysis v ON i.id = v.image_id
                 WHERE v.mood = ?
                 ORDER BY i.captured_at DESC
-                LIMIT ?
-            """, (mood, limit))
+                LIMIT ? OFFSET ?
+            """, (mood, limit, offset))
             return [dict(row) for row in cursor.fetchall()]
 
-    def get_images_by_location_type(self, location_type: str, limit: int = 100) -> List[Dict]:
+    def get_images_by_location_type(self, location_type: str, limit: int = 100, offset: int = 0) -> List[Dict]:
         """按地点类型（室内/户外）获取图片"""
         if location_type == "indoor":
             categories = "('室内', 'home', 'indoor')"
@@ -623,6 +632,89 @@ class Database:
                 JOIN vl_analysis v ON i.id = v.image_id
                 WHERE v.category IN {categories}
                 ORDER BY i.captured_at DESC
-                LIMIT ?
-            """, (limit,))
+                LIMIT ? OFFSET ?
+            """, (limit, offset))
             return [dict(row) for row in cursor.fetchall()]
+
+    def get_count_by_category(self, category: str) -> int:
+        """获取某分类的图片总数"""
+        with self.get_connection() as conn:
+            cursor = conn.execute("""
+                SELECT COUNT(*) FROM images i
+                JOIN vl_analysis v ON i.id = v.image_id
+                WHERE v.category = ?
+            """, (category,))
+            return cursor.fetchone()[0]
+
+    def get_count_by_mood(self, mood: str) -> int:
+        """获取某氛围的图片总数"""
+        with self.get_connection() as conn:
+            cursor = conn.execute("""
+                SELECT COUNT(*) FROM images i
+                JOIN vl_analysis v ON i.id = v.image_id
+                WHERE v.mood = ?
+            """, (mood,))
+            return cursor.fetchone()[0]
+
+    def get_count_by_location_type(self, location_type: str) -> int:
+        """获取某地点类型（室内/户外）的图片总数"""
+        if location_type == "indoor":
+            categories = "('室内', 'home', 'indoor')"
+        else:
+            categories = "('户外', 'outdoor', 'nature', '旅游')"
+
+        with self.get_connection() as conn:
+            cursor = conn.execute(f"""
+                SELECT COUNT(*) FROM images i
+                JOIN vl_analysis v ON i.id = v.image_id
+                WHERE v.category IN {categories}
+            """)
+            return cursor.fetchone()[0]
+
+    def get_count_by_year(self, year: str) -> int:
+        """获取某年份的图片总数"""
+        if year == "未知":
+            query = """
+                SELECT COUNT(*) FROM images i
+                WHERE i.captured_at IS NULL
+                   OR i.captured_at = ''
+                   OR strftime('%Y', i.captured_at) IS NULL
+            """
+            params = ()
+        else:
+            query = """
+                SELECT COUNT(*) FROM images i
+                WHERE strftime('%Y', i.captured_at) = ?
+            """
+            params = (year,)
+
+        with self.get_connection() as conn:
+            cursor = conn.execute(query, params)
+            return cursor.fetchone()[0]
+
+    def get_count_by_person(self, person_name: str) -> int:
+        """获取某人物的图片总数"""
+        with self.get_connection() as conn:
+            cursor = conn.execute("""
+                SELECT COUNT(DISTINCT i.id) FROM images i
+                JOIN faces f ON i.id = f.image_id
+                WHERE f.person_name = ?
+            """, (person_name,))
+            return cursor.fetchone()[0]
+
+    def get_count_by_camera(self, make: str, model: str = None) -> int:
+        """获取某设备的图片总数"""
+        with self.get_connection() as conn:
+            if model:
+                cursor = conn.execute("""
+                    SELECT COUNT(DISTINCT i.id) FROM images i
+                    JOIN exif_data e ON i.id = e.image_id
+                    WHERE e.make = ? AND e.model = ?
+                """, (make, model))
+            else:
+                cursor = conn.execute("""
+                    SELECT COUNT(DISTINCT i.id) FROM images i
+                    JOIN exif_data e ON i.id = e.image_id
+                    WHERE e.make = ?
+                """, (make,))
+            return cursor.fetchone()[0]
