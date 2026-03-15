@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}浏览照片{% endblock %}
+{% block title %}AutoAlbum - 家庭相册{% endblock %}
 
 {% block content %}
 <div class="row">
@@ -160,7 +160,7 @@
                     <span class="badge bg-secondary">{{ cam.count }} 张</span>
                 </div>
                 <div class="card-body">
-                    {% if cam.preview_image_id %}
+                    {% if cam.preview_image_path %}
                     <div class="photo-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.75rem;">
                         <div class="photo-card card">
                             <a href="/images?camera={{ cam.make }}+{{ cam.model }}">
@@ -327,7 +327,7 @@
                     }
                 });
             }, {
-                rootMargin: '50px 0px',
+                rootMargin: '50px 0px', // 提前 50px 加载
                 threshold: 0.01
             });
 
@@ -344,6 +344,7 @@
 
             if (!src || this.loadedImages.has(id)) return;
 
+            // 使用 API 获取缩略图
             fetch(src)
                 .then(response => response.json())
                 .then(data => {
@@ -362,6 +363,7 @@
             const idsToFetch = imageIds.filter(id => !this.loadedImages.has(id));
             if (idsToFetch.length === 0) return;
 
+            // 添加到预取队列
             this.prefetchQueue.push(...idsToFetch);
             this.processPrefetchQueue();
         }
@@ -373,6 +375,7 @@
             this.prefetching = true;
             this.showPrefetchStatus();
 
+            // 每次取 20 张图片进行预取
             const batch = this.prefetchQueue.splice(0, 20);
 
             fetch('/api/thumbnails/batch', {
@@ -399,6 +402,7 @@
                 this.prefetching = false;
                 this.hidePrefetchStatus();
 
+                // 继续处理队列
                 if (this.prefetchQueue.length > 0) {
                     setTimeout(() => this.processPrefetchQueue(), 100);
                 }
@@ -410,7 +414,7 @@
             });
         }
 
-        // 智能预取
+        // 智能预取：当用户滚动接近页面底部时，预取下一页
         initSmartPrefetch() {
             let ticking = false;
             window.addEventListener('scroll', () => {
@@ -430,7 +434,9 @@
             const windowHeight = window.innerHeight;
             const docHeight = document.documentElement.scrollHeight;
 
+            // 当滚动到 70% 位置时，开始预取
             if (scrollTop + windowHeight > docHeight * 0.7) {
+                // 收集所有还未加载的图片 ID
                 const allImageIds = [];
                 document.querySelectorAll('.lazy-image').forEach(img => {
                     const id = parseInt(img.dataset.id);
@@ -445,11 +451,15 @@
             }
         }
 
+        // 显示预取状态
         showPrefetchStatus() {
             const status = document.getElementById('prefetch-status');
-            if (status) status.style.display = 'block';
+            if (status) {
+                status.style.display = 'block';
+            }
         }
 
+        // 隐藏预取状态
         hidePrefetchStatus() {
             const status = document.getElementById('prefetch-status');
             if (status) {

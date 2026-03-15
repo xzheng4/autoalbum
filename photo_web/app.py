@@ -5,6 +5,8 @@ import os
 import base64
 import io
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
+from multiprocessing import cpu_count
 from flask import Flask, render_template, request, jsonify, send_file, url_for
 from PIL import Image
 
@@ -21,6 +23,25 @@ app.config["MAX_THUMBNAIL_SIZE"] = (400, 400)
 
 # 初始化数据库
 db = Database(str(DATABASE_PATH))
+
+# 线程池：使用 CPU 核心数的 90% 作为线程数
+# 缩略图生成是 I/O 密集型任务（读取图片文件），适合使用多线程
+MAX_WORKERS = max(1, int(cpu_count() * 0.9))
+thumbnail_executor = ThreadPoolExecutor(max_workers=MAX_WORKERS)
+
+
+def generate_thumbnail_for_id(image_id: int) -> dict:
+    """为指定的图片 ID 生成缩略图（用于线程池任务）"""
+    img = db.get_image_by_id(image_id)
+    if img and os.path.exists(img['file_path']):
+        try:
+            thumbnail = image_to_base64(img['file_path'])
+            return {"id": image_id, "thumbnail": thumbnail}
+        except Exception as e:
+            print(f"Error generating thumbnail for image {image_id}: {e}")
+            return {"id": image_id, "thumbnail": ""}
+    else:
+        return {"id": image_id, "thumbnail": ""}
 
 
 def get_thumbnail(image_path: str, size: tuple = None) -> bytes:
@@ -56,35 +77,66 @@ def image_to_base64(image_path: str, size: tuple = None) -> str:
 
 @app.route("/")
 def index():
-    """首页 - 按日期分组展示"""
-    # 获取统计信息
-    total_images = db.get_image_count()
-    processed_images = db.get_processed_count()
-    persons = db.get_all_persons()
+    """首页 - 浏览页面（左边分类导航，右边照片集合）"""
+    # 获取 5 大类分类数据
+    year_stats = db.get_year_stats()  # 按时间（年份）
+    persons_data = db.get_person_stats_with_images()  # 按人物
+    camera_stats = db.get_camera_stats_detailed()  # 按拍摄设备
+    location_stats = db.get_location_stats()  # 户外/室内
 
-    # 获取按日期分组的图片
-    date_groups = db.get_images_grouped_by_date(limit=20)
+    # 为每个年份获取预览图片（只获取 ID 和基本信息，缩略图懒加载）
+    for year in year_stats:
+        images = db.get_images_by_year(year["year"], limit=12)
+        year["preview_images"] = [{
+            'id': img['id'],
+            'file_path': img['file_path'],
+            'captured_at': img.get('captured_at', '')
+        } for img in images]
 
-    # 为每个日期组获取预览图片
-    for group in date_groups:
-        ids = group.get('ids', '')
-        if ids:
-            # 获取该日期的第一张图片作为预览
-            preview_ids = ids.split(',')[:3]
-            group['preview_images'] = []
-            for img_id in preview_ids:
-                img = db.get_image_by_id(int(img_id))
-                if img and os.path.exists(img['file_path']):
-                    group['preview_images'].append({
-                        'id': img['id'],
-                        'thumbnail': image_to_base64(img['file_path'])
-                    })
+    # 为每个人物获取预览图片
+    for person in persons_data:
+        images = db.get_images_by_person(person["person_name"])[:12]
+        person["preview_images"] = [{
+            'id': img['id'],
+            'file_path': img['file_path'],
+            'captured_at': img.get('captured_at', '')
+        } for img in images]
 
-    return render_template("index.html",
-                           total_images=total_images,
-                           processed_images=processed_images,
-                           persons=persons,
-                           date_groups=date_groups)
+    # 为每个设备获取预览图片
+    for cam in camera_stats:
+        if cam["sample_image_id"]:
+            img = db.get_image_by_id(cam["sample_image_id"])
+            if img:
+                cam["preview_image_id"] = img['id']
+                cam["preview_image_path"] = img['file_path']
+            else:
+                cam["preview_image_id"] = None
+                cam["preview_image_path"] = None
+        else:
+            cam["preview_image_id"] = None
+            cam["preview_image_path"] = None
+
+    # 获取户外/室内预览图片
+    outdoor_images = db.get_images_by_location_type("outdoor", limit=12)
+    indoor_images = db.get_images_by_location_type("indoor", limit=12)
+
+    location_stats["outdoor_preview"] = [{
+        'id': img['id'],
+        'file_path': img['file_path'],
+        'captured_at': img.get('captured_at', '')
+    } for img in outdoor_images]
+
+    location_stats["indoor_preview"] = [{
+        'id': img['id'],
+        'file_path': img['file_path'],
+        'captured_at': img.get('captured_at', '')
+    } for img in indoor_images]
+
+    return render_template("home.html",
+                           year_stats=year_stats,
+                           persons_data=persons_data,
+                           camera_stats=camera_stats,
+                           location_stats=location_stats)
 
 
 @app.route("/gallery")
@@ -240,50 +292,42 @@ def browse():
     camera_stats = db.get_camera_stats_detailed()  # 按拍摄设备
     location_stats = db.get_location_stats()  # 户外/室内
 
-    # 为每个年份获取预览图片（最多 12 张）
+    # 为每个年份获取预览图片（最多 12 张）- 不内联缩略图，使用懒加载
     for year in year_stats:
         images = db.get_images_by_year(year["year"], limit=12)
-        year["preview_images"] = []
-        for img in images:
-            if os.path.exists(img['file_path']):
-                img['thumbnail'] = image_to_base64(img['file_path'])
-                year["preview_images"].append(img)
+        year["preview_images"] = [{
+            'id': img['id'],
+            'file_path': img['file_path']
+        } for img in images]
 
-    # 为每个人物获取预览图片（最多 12 张）
+    # 为每个人物获取预览图片（最多 12 张）- 不内联缩略图，使用懒加载
     for person in persons_data:
         images = db.get_images_by_person(person["person_name"])[:12]
-        person["preview_images"] = []
-        for img in images:
-            if os.path.exists(img['file_path']):
-                img['thumbnail'] = image_to_base64(img['file_path'])
-                person["preview_images"].append(img)
+        person["preview_images"] = [{
+            'id': img['id'],
+            'file_path': img['file_path']
+        } for img in images]
 
-    # 为每个设备获取预览图片
+    # 为每个设备获取预览图片 ID
     for cam in camera_stats:
         if cam["sample_image_id"]:
-            img = db.get_image_by_id(cam["sample_image_id"])
-            if img and os.path.exists(img['file_path']):
-                cam["preview_thumbnail"] = image_to_base64(img['file_path'])
-            else:
-                cam["preview_thumbnail"] = None
+            cam["preview_image_id"] = cam["sample_image_id"]
         else:
-            cam["preview_thumbnail"] = None
+            cam["preview_image_id"] = None
 
-    # 获取户外/室内预览图片
+    # 获取户外/室内预览图片 - 不内联缩略图，使用懒加载
     outdoor_images = db.get_images_by_location_type("outdoor", limit=12)
     indoor_images = db.get_images_by_location_type("indoor", limit=12)
 
-    location_stats["outdoor_preview"] = []
-    for img in outdoor_images:
-        if os.path.exists(img['file_path']):
-            img['thumbnail'] = image_to_base64(img['file_path'])
-            location_stats["outdoor_preview"].append(img)
+    location_stats["outdoor_preview"] = [{
+        'id': img['id'],
+        'file_path': img['file_path']
+    } for img in outdoor_images]
 
-    location_stats["indoor_preview"] = []
-    for img in indoor_images:
-        if os.path.exists(img['file_path']):
-            img['thumbnail'] = image_to_base64(img['file_path'])
-            location_stats["indoor_preview"].append(img)
+    location_stats["indoor_preview"] = [{
+        'id': img['id'],
+        'file_path': img['file_path']
+    } for img in indoor_images]
 
     return render_template("browse.html",
                            year_stats=year_stats,
@@ -455,6 +499,39 @@ def api_images_list():
         "total_pages": total_pages,
         "has_next": page < total_pages
     })
+
+
+@app.route("/api/thumbnail/<int:image_id>")
+def api_thumbnail(image_id):
+    """API - 获取单张图片的缩略图（base64）"""
+    img = db.get_image_by_id(image_id)
+    if not img or not os.path.exists(img['file_path']):
+        return jsonify({"error": "Image not found"}), 404
+
+    thumbnail = image_to_base64(img['file_path'])
+    return jsonify({
+        "id": image_id,
+        "thumbnail": thumbnail
+    })
+
+
+@app.route("/api/thumbnails/batch", methods=["POST"])
+def api_batch_thumbnails():
+    """API - 批量获取缩略图（用于预取，多线程并行处理）"""
+    data = request.get_json()
+    image_ids = data.get("image_ids", [])
+
+    if not image_ids:
+        return jsonify({"thumbnails": []})
+
+    # 限制每次请求的数量
+    image_ids = image_ids[:50]
+
+    # 使用线程池并行处理缩略图生成
+    # ThreadPoolExecutor.map 会保持结果顺序与输入顺序一致
+    results = list(thumbnail_executor.map(generate_thumbnail_for_id, image_ids))
+
+    return jsonify({"thumbnails": results})
 
 
 # 错误页面
