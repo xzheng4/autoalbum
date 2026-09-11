@@ -1,86 +1,91 @@
 {% extends "base.html" %}
-
 {% block title %}首页{% endblock %}
 
 {% block content %}
-<!-- 统计卡片 -->
-<div class="row mb-4">
-    <div class="col-md-4 mb-3">
-        <div class="stat-card">
-            <div class="stat-number">{{ total_images }}</div>
-            <div class="stat-label">总照片数</div>
-        </div>
-    </div>
-    <div class="col-md-4 mb-3">
-        <div class="stat-card">
-            <div class="stat-number">{{ processed_images }}</div>
-            <div class="stat-label">已处理</div>
-        </div>
-    </div>
-    <div class="col-md-4 mb-3">
-        <div class="stat-card">
-            <div class="stat-number">{{ persons|length }}</div>
-            <div class="stat-label">家庭成员</div>
-        </div>
-    </div>
+<!-- Hero -->
+<div class="hero">
+    <h1 class="hero-hello" id="greeting">欢迎回家</h1>
+    <p class="hero-date" id="todayDate"></p>
 </div>
 
-<!-- 快速链接 -->
+<!-- 统计 -->
+<div class="stats">
+    <a class="stat" href="/gallery">
+        <div class="stat-num">{{ total_images }}</div>
+        <div class="stat-label"><i class="bi bi-images"></i> 总照片数</div>
+    </a>
+    <a class="stat" href="/browse">
+        <div class="stat-num">{{ processed_images }}</div>
+        <div class="stat-label"><i class="bi bi-check-circle"></i> 已处理</div>
+    </a>
+    <a class="stat" href="/persons">
+        <div class="stat-num">{{ persons|length }}</div>
+        <div class="stat-label"><i class="bi bi-people"></i> 家庭成员</div>
+    </a>
+</div>
+
+<!-- 家庭成员 -->
 {% if persons %}
-<div class="card mb-4">
-    <div class="card-header">
-        <i class="bi bi-people"></i> 家庭成员
+<div class="sec">
+    <div class="sec-head">
+        <h2 class="sec-title"><i class="bi bi-people"></i> 家庭成员</h2>
+        <a class="sec-more" href="/persons">查看全部 <i class="bi bi-arrow-right"></i></a>
     </div>
-    <div class="card-body">
-        {% for person in persons %}
-        <a href="/person/{{ person }}" class="person-badge text-decoration-none">
-            <i class="bi bi-person-circle"></i> {{ person }}
+    <div class="people-row">
+        {% for person in persons[:12] %}
+        <a class="pcircle" href="/person/{{ person }}">
+            <span class="pcircle-fallback">{{ person[0] }}</span>
+            <span class="pcircle-name">{{ person }}</span>
         </a>
         {% endfor %}
     </div>
 </div>
 {% endif %}
 
-<!-- 按日期分组 -->
-<div class="date-groups">
-    <h3 class="mb-3">
-        <i class="bi bi-calendar3"></i> 最近照片
-    </h3>
-
-    {% if date_groups %}
-        {% for group in date_groups %}
-        <div class="date-group">
-            <div class="date-header">
-                <i class="bi bi-calendar-event"></i> {{ group.date_group }}
-                <span class="text-muted">({{ group.count }} 张)</span>
-            </div>
-
-            <div class="photo-grid">
-                {% for img in group.preview_images %}
-                <div class="photo-card" onclick="location.href='/image/{{ img.id }}'">
-                    <img src="data:image/jpeg;base64,{{ img.thumbnail }}" alt="Photo">
-                </div>
-                {% endfor %}
-
-                <div class="photo-card" onclick="location.href='/gallery'">
-                    <div class="d-flex align-items-center justify-content-center h-100"
-                         style="background: #f8f9fa; min-height: 200px;">
-                        <div class="text-center text-muted">
-                            <i class="bi bi-grid-3x3-gap" style="font-size: 2rem;"></i>
-                            <div class="mt-2">查看全部</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+<!-- 最近照片 -->
+{% if date_groups %}
+    {% for group in date_groups[:3] %}
+    <div class="sec">
+        <div class="sec-head">
+            <h2 class="sec-title">
+                <i class="bi bi-calendar3"></i> {{ group.date_group }}
+                <span class="sec-count">{{ group.count }} 张</span>
+            </h2>
+            <a class="sec-more" href="/gallery">画廊 <i class="bi bi-arrow-right"></i></a>
         </div>
-        {% endfor %}
-    {% else %}
-        <div class="alert alert-info">
-            <i class="bi bi-info-circle"></i>
-            暂无照片。请先运行照片分析器处理照片。
-            <br><br>
-            <code>python -m photo_analyzer.main analyze</code>
+        {% if group.preview_images %}
+        <div class="pgrid">
+            {% for img in group.preview_images[:8] %}
+            <a class="ptile" href="/image/{{ img.id }}">
+                <img src="data:image/jpeg;base64,{{ img.thumbnail }}" alt="{{ group.date_group }}" loading="lazy">
+                <span class="ptile-meta"><i class="bi bi-calendar3"></i> {{ group.date_group }}</span>
+            </a>
+            {% endfor %}
         </div>
-    {% endif %}
+        {% endif %}
+    </div>
+    {% endfor %}
+{% else %}
+<div class="empty-state">
+    <div class="empty-state-icon"><i class="bi bi-images"></i></div>
+    <h3 class="empty-state-title">暂无照片</h3>
+    <p class="empty-state-description">请先运行照片分析器处理照片</p>
+    <code class="code-inline">python -m photo_analyzer.main analyze</code>
 </div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // 按时间段问候
+    (function () {
+        var h = new Date().getHours();
+        var g = h < 5 ? '夜深了' : h < 9 ? '早上好' : h < 12 ? '上午好' : h < 14 ? '中午好' : h < 18 ? '下午好' : '晚上好';
+        document.getElementById('greeting').textContent = g;
+        var d = new Date();
+        var week = ['日', '一', '二', '三', '四', '五', '六'][d.getDay()];
+        document.getElementById('todayDate').textContent =
+            d.getFullYear() + ' 年 ' + (d.getMonth() + 1) + ' 月 ' + d.getDate() + ' 日 · 星期' + week;
+    })();
+</script>
 {% endblock %}

@@ -1,34 +1,67 @@
 {% extends "base.html" %}
-
 {% block title %}{{ person_name }}{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <div>
-        <a href="/persons" class="text-decoration-none">
-            <i class="bi bi-arrow-left"></i> 返回人物列表
-        </a>
-        <h2 class="mt-2">
-            <i class="bi bi-person-circle"></i> {{ person_name }}
-        </h2>
-    </div>
-    <div>
-        <span class="text-muted">{{ total }} 张照片</span>
+<div class="page-head">
+    <div style="display: flex; align-items: center; gap: 16px;">
+        <a href="/persons" class="icon-btn" title="返回"><i class="bi bi-arrow-left"></i></a>
+        {% if images and images[0].thumbnail %}
+        <img src="data:image/jpeg;base64,{{ images[0].thumbnail }}" alt="{{ person_name }}"
+             style="width: 56px; height: 56px; border-radius: 999px; object-fit: cover;">
+        {% else %}
+        <span class="pcard-fallback" style="width: 56px; height: 56px; font-size: 20px;">{{ person_name[0] }}</span>
+        {% endif %}
+        <div>
+            <h1 class="page-title">{{ person_name }}</h1>
+            <p class="page-sub">{{ total }} 张照片</p>
+        </div>
     </div>
 </div>
 
 {% if images %}
-<div class="photo-grid">
+<div class="pgrid">
     {% for img in images %}
-    <div class="photo-card" onclick="location.href='/image/{{ img.id }}'">
-        <img src="data:image/jpeg;base64,{{ img.thumbnail }}" alt="Photo">
+    <div class="ptile" data-id="{{ img.id }}">
+        {% if img.thumbnail %}
+        <img src="data:image/jpeg;base64,{{ img.thumbnail }}" alt="{{ person_name }}" loading="lazy">
+        {% endif %}
+        {% if img.captured_at %}
+        <span class="ptile-meta"><i class="bi bi-calendar3"></i> {{ img.captured_at[:10] }}</span>
+        {% endif %}
     </div>
     {% endfor %}
 </div>
 {% else %}
-<div class="alert alert-info">
-    <i class="bi bi-info-circle"></i>
-    暂无该成员的照片。
+<div class="empty-state">
+    <div class="empty-state-icon"><i class="bi bi-image"></i></div>
+    <h3 class="empty-state-title">暂无该成员的照片</h3>
+    <p class="empty-state-description">当前还没有识别到 {{ person_name }} 的照片</p>
+    <div style="margin-top: 20px;">
+        <a href="/browse" class="btn btn-accent"><i class="bi bi-compass"></i> 浏览所有照片</a>
+    </div>
 </div>
 {% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    var personImages = [
+        {% for img in images %}
+        {
+            id: {{ img.id }},
+            src: 'data:image/jpeg;base64,{{ img.thumbnail or "" }}',
+            caption: '{{ person_name }}{% if img.captured_at %} · {{ img.captured_at[:10] }}{% endif %}',
+            url: '/image/{{ img.id }}/full'
+        },
+        {% endfor %}
+    ];
+
+    document.querySelector('.pgrid')?.addEventListener('click', function (e) {
+        var tile = e.target.closest('.ptile');
+        if (!tile) return;
+        var id = parseInt(tile.dataset.id, 10);
+        var idx = personImages.findIndex(function (img) { return img.id === id; });
+        if (idx >= 0 && window.lightbox) lightbox.open(idx, personImages);
+    });
+</script>
 {% endblock %}

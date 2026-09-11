@@ -1,44 +1,50 @@
 {% extends "base.html" %}
-
 {% block title %}人物{% endblock %}
 
 {% block content %}
-<h2 class="mb-4">
-    <i class="bi bi-people"></i> 家庭成员
-</h2>
+<div class="page-head">
+    <div>
+        <h1 class="page-title">人物</h1>
+        <p class="page-sub">已识别 {{ persons|length }} 位家庭成员</p>
+    </div>
+</div>
 
 {% if persons %}
-<div class="row">
+<div class="pcard-grid">
     {% for person in persons %}
-    <div class="col-md-4 col-lg-3 mb-4">
-        <div class="card h-100" onclick="location.href='/person/{{ person.name }}'" style="cursor: pointer;">
-            {% if person.preview %}
-            <img src="data:image/jpeg;base64,{{ person.preview }}" class="card-img-top" alt="{{ person.name }}"
-                 style="height: 200px; object-fit: cover;">
-            {% else %}
-            <div class="card-img-top d-flex align-items-center justify-content-center bg-light"
-                 style="height: 200px;">
-                <i class="bi bi-person-circle" style="font-size: 4rem; color: #ccc;"></i>
-            </div>
-            {% endif %}
-            <div class="card-body text-center">
-                <h5 class="card-title">{{ person.name }}</h5>
-                <p class="card-text text-muted">
-                    <i class="bi bi-images"></i> {{ person.count }} 张照片
-                </p>
-            </div>
-        </div>
-    </div>
+    <a class="pcard" href="/person/{{ person.name }}">
+        {% if person.preview %}
+        <img src="data:image/jpeg;base64,{{ person.preview }}" alt="{{ person.name }}" loading="lazy">
+        {% else %}
+        <span class="pcard-fallback">{{ person.name[0] }}</span>
+        {% endif %}
+        <span class="pcard-name">{{ person.name }}</span>
+        <span class="pcard-count">{{ person.count }} 张照片</span>
+    </a>
     {% endfor %}
 </div>
+
+<div class="tip" style="margin-top: 32px;">
+    <i class="bi bi-lightbulb"></i>
+    <div>
+        <strong style="color: var(--text);">如何添加家庭成员？</strong>
+        <ol>
+            <li>在 <code>data/faces/</code> 目录下创建以人名命名的子目录</li>
+            <li>放入该成员的清晰正面照片（建议 1-3 张）</li>
+            <li>运行 <code>python -m photo_analyzer.main register</code> 注册人脸</li>
+            <li>重新分析照片即可自动识别该成员</li>
+        </ol>
+    </div>
+</div>
 {% else %}
-<div class="alert alert-info">
-    <i class="bi bi-info-circle"></i>
-    暂无已识别的家庭成员。
-    <br><br>
-    请先在 <code>data/faces/</code> 目录下添加家庭成员照片，然后运行：
-    <br>
-    <code>python -m photo_analyzer.main register</code>
+<div class="empty-state">
+    <div class="empty-state-icon"><i class="bi bi-people"></i></div>
+    <h3 class="empty-state-title">暂无已识别的家庭成员</h3>
+    <p class="empty-state-description">在 <code>data/faces/</code> 目录下添加家庭成员照片，然后运行注册命令</p>
+    <code class="code-inline">python -m photo_analyzer.main register</code>
+    <div style="margin-top: 20px;">
+        <a href="/browse" class="btn btn-outline"><i class="bi bi-compass"></i> 浏览所有照片</a>
+    </div>
 </div>
 {% endif %}
 {% endblock %}

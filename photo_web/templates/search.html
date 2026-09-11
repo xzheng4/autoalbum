@@ -1,51 +1,90 @@
 {% extends "base.html" %}
-
 {% block title %}搜索{% endblock %}
 
 {% block content %}
-<h2 class="mb-4">
-    <i class="bi bi-search"></i> 搜索照片
-</h2>
-
-<!-- 搜索框 -->
-<form class="mb-4" action="/search" method="GET">
-    <div class="input-group input-group-lg">
-        <input type="text" class="form-control" name="q" value="{{ query }}"
-               placeholder="搜索 OCR 文字、分类、人物名..." autofocus>
-        <button class="btn btn-primary" type="submit">
-            <i class="bi bi-search"></i> 搜索
-        </button>
+{% if not query %}
+<!-- 搜索主视觉 -->
+<div style="max-width: 620px; margin: 8vh auto 0; text-align: center;">
+    <h1 class="hero-hello" style="margin-bottom: 24px;">搜索照片</h1>
+    <form action="/search" method="get" class="searchbox" style="max-width: none;" role="search">
+        <i class="bi bi-search" style="font-size: 16px;"></i>
+        <input type="search" name="q" placeholder="试试「海边」「生日」「发票」…"
+               autocomplete="off" autofocus
+               style="padding-top: 13px; padding-bottom: 13px; font-size: 15px;">
+    </form>
+    <div style="margin-top: 22px; display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;">
+        <span style="font-size: 12.5px; color: var(--text-3); align-self: center;">热门：</span>
+        <a href="/search?q=户外" class="chip">户外</a>
+        <a href="/search?q=室内" class="chip">室内</a>
+        <a href="/search?q=合影" class="chip">合影</a>
+        <a href="/search?q=旅游" class="chip">旅游</a>
+        <a href="/search?q=美食" class="chip">美食</a>
+        <a href="/search?q=宠物" class="chip">宠物</a>
     </div>
-</form>
-
-{% if query %}
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <h4>
-        {% if results %}
-            找到 {{ total }} 张相关照片
-        {% else %}
-            未找到相关照片
-        {% endif %}
-    </h4>
-    <span class="text-muted">搜索："{{ query }}"</span>
+</div>
+{% else %}
+<!-- 搜索结果 -->
+<div class="page-head">
+    <div>
+        <h1 class="page-title">
+            {% if results %}找到 {{ total }} 张照片{% else %}未找到相关照片{% endif %}
+        </h1>
+        <p class="page-sub">搜索：「{{ query }}」 · <a href="/search" style="color: var(--accent); text-decoration: none;">重新搜索</a></p>
+    </div>
 </div>
 
 {% if results %}
-<div class="photo-grid">
+<div class="pgrid">
     {% for img in results %}
-    <div class="photo-card" onclick="location.href='/image/{{ img.id }}'">
-        <img src="data:image/jpeg;base64,{{ img.thumbnail }}" alt="Photo"
-             title="{% if img.ocr_text %}OCR: {{ img.ocr_text[:50] }}... {% endif %}
-{% if img.category %}分类：{{ img.category }}{% endif %}">
+    <div class="ptile" data-id="{{ img.id }}">
+        {% if img.thumbnail %}
+        <img src="data:image/jpeg;base64,{{ img.thumbnail }}" alt="搜索结果" loading="lazy">
+        {% endif %}
+        {% if img.category %}
+        <span class="ptile-badge">{{ img.category }}</span>
+        {% endif %}
+        {% if img.ocr_text %}
+        <span class="ptile-meta"><i class="bi bi-text-paragraph"></i> {{ img.ocr_text[:24] }}{% if img.ocr_text|length > 24 %}…{% endif %}</span>
+        {% elif img.captured_at %}
+        <span class="ptile-meta"><i class="bi bi-calendar3"></i> {{ img.captured_at[:10] }}</span>
+        {% endif %}
     </div>
     {% endfor %}
 </div>
-{% endif %}
 {% else %}
-<div class="text-center text-muted py-5">
-    <i class="bi bi-search" style="font-size: 4rem;"></i>
-    <p class="mt-3">输入关键词搜索照片</p>
-    <p class="small">支持搜索：OCR 文字、图片分类、人物名称、场景描述</p>
+<div class="empty-state">
+    <div class="empty-state-icon"><i class="bi bi-emoji-frown"></i></div>
+    <h3 class="empty-state-title">未找到相关照片</h3>
+    <p class="empty-state-description">尝试使用其他关键词，或检查拼写是否正确</p>
+    <div style="margin-top: 20px;">
+        <a href="/search" class="btn btn-accent"><i class="bi bi-arrow-counterclockwise"></i> 重新搜索</a>
+    </div>
 </div>
+{% endif %}
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+{% if results %}
+<script>
+    var searchImages = [
+        {% for img in results %}
+        {
+            id: {{ img.id }},
+            src: 'data:image/jpeg;base64,{{ img.thumbnail or "" }}',
+            caption: '{{ (img.ocr_text or img.category or "")[:50] | replace("'", "\\'") }}',
+            url: '/image/{{ img.id }}/full'
+        },
+        {% endfor %}
+    ];
+
+    document.querySelector('.pgrid').addEventListener('click', function (e) {
+        var tile = e.target.closest('.ptile');
+        if (!tile) return;
+        var id = parseInt(tile.dataset.id, 10);
+        var idx = searchImages.findIndex(function (img) { return img.id === id; });
+        if (idx >= 0 && window.lightbox) lightbox.open(idx, searchImages);
+    });
+</script>
 {% endif %}
 {% endblock %}

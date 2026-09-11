@@ -1,67 +1,111 @@
 {% extends "base.html" %}
-
 {% block title %}画廊{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2>
-        <i class="bi bi-grid"></i> 画廊
-    </h2>
+<div class="page-head">
     <div>
-        <span class="text-muted">{{ total }} 张照片</span>
+        <h1 class="page-title">画廊</h1>
+        <p class="page-sub">{{ total }} 张照片</p>
+    </div>
+    <div class="seg" role="group" aria-label="网格密度">
+        <button type="button" data-size="compact" title="紧凑"><i class="bi bi-grid-3x3"></i></button>
+        <button type="button" data-size="standard" class="active" title="标准"><i class="bi bi-grid"></i></button>
+        <button type="button" data-size="wide" title="宽松"><i class="bi bi-grid-1x2"></i></button>
     </div>
 </div>
 
 {% if images %}
-<div class="photo-grid">
+<div class="pgrid" id="galleryGrid">
     {% for img in images %}
-    <div class="photo-card" onclick="location.href='/image/{{ img.id }}'">
-        <img src="data:image/jpeg;base64,{{ img.thumbnail }}" alt="Photo"
-             title="{{ img.file_path }}
-{% if img.captured_at %}拍摄：{{ img.captured_at }}{% endif %}">
+    <div class="ptile" data-id="{{ img.id }}">
+        {% if img.thumbnail %}
+        <img src="data:image/jpeg;base64,{{ img.thumbnail }}" alt="照片 {{ img.id }}" loading="lazy">
+        {% endif %}
+        {% if img.captured_at %}
+        <span class="ptile-meta"><i class="bi bi-calendar3"></i> {{ img.captured_at[:10] }}</span>
+        {% endif %}
     </div>
     {% endfor %}
 </div>
 
 <!-- 分页 -->
-<nav>
+<nav aria-label="分页">
     <ul class="pagination">
-        <li class="page-item {% if page <= 1 %}disabled{% endif %}">
-            <a class="page-link" href="/gallery?page={{ page - 1 }}">
-                <i class="bi bi-chevron-left"></i> 上一页
-            </a>
+        <li>
+            <a class="pagination-item {% if page <= 1 %}disabled{% endif %}"
+               href="/gallery?page={{ page - 1 }}" aria-label="上一页"><i class="bi bi-chevron-left"></i></a>
         </li>
-
         {% for p in range(1, total_pages + 1) %}
             {% if p == page %}
-                <li class="page-item active">
-                    <span class="page-link">{{ p }}</span>
-                </li>
+            <li><span class="pagination-item active">{{ p }}</span></li>
             {% elif p == 1 or p == total_pages or (p >= page - 2 and p <= page + 2) %}
-                <li class="page-item">
-                    <a class="page-link" href="/gallery?page={{ p }}">{{ p }}</a>
-                </li>
+            <li><a class="pagination-item" href="/gallery?page={{ p }}">{{ p }}</a></li>
             {% elif p == page - 3 or p == page + 3 %}
-                <li class="page-item disabled">
-                    <span class="page-link">...</span>
-                </li>
+            <li><span class="pagination-item disabled">…</span></li>
             {% endif %}
         {% endfor %}
-
-        <li class="page-item {% if page >= total_pages %}disabled{% endif %}">
-            <a class="page-link" href="/gallery?page={{ page + 1 }}">
-                下一页 <i class="bi bi-chevron-right"></i>
-            </a>
+        <li>
+            <a class="pagination-item {% if page >= total_pages %}disabled{% endif %}"
+               href="/gallery?page={{ page + 1 }}" aria-label="下一页"><i class="bi bi-chevron-right"></i></a>
         </li>
     </ul>
 </nav>
-
 {% else %}
-<div class="alert alert-info">
-    <i class="bi bi-info-circle"></i>
-    暂无照片。请先运行照片分析器处理照片。
-    <br><br>
-    <code>python -m photo_analyzer.main analyze</code>
+<div class="empty-state">
+    <div class="empty-state-icon"><i class="bi bi-images"></i></div>
+    <h3 class="empty-state-title">暂无照片</h3>
+    <p class="empty-state-description">请先运行照片分析器处理照片</p>
+    <code class="code-inline">python -m photo_analyzer.main analyze</code>
 </div>
 {% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // 图片数据 + 灯箱
+    var galleryImages = [
+        {% for img in images %}
+        {
+            id: {{ img.id }},
+            src: 'data:image/jpeg;base64,{{ img.thumbnail or "" }}',
+            caption: '{{ img.captured_at[:10] if img.captured_at else "未知日期" }}',
+            url: '/image/{{ img.id }}/full'
+        },
+        {% endfor %}
+    ];
+
+    document.getElementById('galleryGrid').addEventListener('click', function (e) {
+        var tile = e.target.closest('.ptile');
+        if (!tile) return;
+        var id = parseInt(tile.dataset.id, 10);
+        var idx = galleryImages.findIndex(function (img) { return img.id === id; });
+        if (idx >= 0 && window.lightbox) lightbox.open(idx, galleryImages);
+    });
+
+    // 双击进入详情页
+    document.getElementById('galleryGrid').addEventListener('dblclick', function (e) {
+        var tile = e.target.closest('.ptile');
+        if (tile) location.href = '/image/' + tile.dataset.id;
+    });
+
+    // 网格密度
+    (function () {
+        var grid = document.getElementById('galleryGrid');
+        var saved = localStorage.getItem('aa-grid-size') || 'standard';
+        apply(saved);
+        document.querySelectorAll('.seg button').forEach(function (b) {
+            b.addEventListener('click', function () {
+                apply(b.dataset.size);
+                localStorage.setItem('aa-grid-size', b.dataset.size);
+            });
+        });
+        function apply(size) {
+            grid.classList.remove('compact', 'wide');
+            if (size !== 'standard') grid.classList.add(size);
+            document.querySelectorAll('.seg button').forEach(function (x) {
+                x.classList.toggle('active', x.dataset.size === size);
+            });
+        }
+    })();
+</script>
 {% endblock %}

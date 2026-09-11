@@ -1,34 +1,56 @@
 {% extends "base.html" %}
-
 {% block title %}{{ category }}{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="page-head">
     <div>
-        <a href="/gallery" class="text-decoration-none">
-            <i class="bi bi-arrow-left"></i> 返回画廊
-        </a>
-        <h2 class="mt-2">
-            <i class="bi bi-folder"></i> {{ category }}
-        </h2>
+        <h1 class="page-title">{{ category }}</h1>
+        <p class="page-sub">{{ total }} 张照片</p>
     </div>
-    <div>
-        <span class="text-muted">{{ total }} 张照片</span>
-    </div>
+    <a href="/browse" class="btn btn-outline btn-sm"><i class="bi bi-compass"></i> 浏览全部</a>
 </div>
 
 {% if images %}
-<div class="photo-grid">
+<div class="pgrid">
     {% for img in images %}
-    <div class="photo-card" onclick="location.href='/image/{{ img.id }}'">
-        <img src="data:image/jpeg;base64,{{ img.thumbnail }}" alt="Photo">
+    <div class="ptile" data-id="{{ img.id }}">
+        {% if img.thumbnail %}
+        <img src="data:image/jpeg;base64,{{ img.thumbnail }}" alt="{{ category }}" loading="lazy">
+        {% endif %}
+        {% if img.captured_at %}
+        <span class="ptile-meta"><i class="bi bi-calendar3"></i> {{ img.captured_at[:10] }}</span>
+        {% endif %}
     </div>
     {% endfor %}
 </div>
 {% else %}
-<div class="alert alert-info">
-    <i class="bi bi-info-circle"></i>
-    该分类下暂无照片。
+<div class="empty-state">
+    <div class="empty-state-icon"><i class="bi bi-folder"></i></div>
+    <h3 class="empty-state-title">该分类下暂无照片</h3>
+    <div style="margin-top: 20px; display: flex; gap: 8px; justify-content: center;">
+        <a href="/browse" class="btn btn-accent"><i class="bi bi-compass"></i> 浏览所有分类</a>
+        <a href="/gallery" class="btn btn-outline"><i class="bi bi-grid"></i> 画廊</a>
+    </div>
 </div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+{% if images %}
+<script>
+    var categoryImages = [
+        {% for img in images %}
+        { id: {{ img.id }}, src: 'data:image/jpeg;base64,{{ img.thumbnail or "" }}',
+          caption: '{{ category }}{% if img.captured_at %} · {{ img.captured_at[:10] }}{% endif %}',
+          url: '/image/{{ img.id }}/full' },
+        {% endfor %}
+    ];
+    document.querySelector('.pgrid').addEventListener('click', function (e) {
+        var tile = e.target.closest('.ptile');
+        if (!tile) return;
+        var idx = categoryImages.findIndex(function (img) { return img.id === parseInt(tile.dataset.id, 10); });
+        if (idx >= 0 && window.lightbox) lightbox.open(idx, categoryImages);
+    });
+</script>
 {% endif %}
 {% endblock %}

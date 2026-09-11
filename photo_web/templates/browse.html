@@ -1,484 +1,222 @@
 {% extends "base.html" %}
-
-{% block title %}浏览照片{% endblock %}
+{% block title %}浏览{% endblock %}
 
 {% block content %}
-<div class="row">
-    <!-- 左侧顶级分类导航 -->
-    <div class="col-md-3 col-lg-2">
-        <div class="sticky-top" style="top: 80px; z-index: 100; max-height: calc(100vh - 100px); overflow-y: auto;">
-
-            <!-- 1. 拍摄时间 -->
-            <div class="card mb-3">
-                <div class="card-header bg-primary text-white">
-                    <i class="bi bi-calendar"></i> 拍摄时间
-                </div>
-                <div class="card-body p-2">
-                    <div class="list-group list-group-flush">
-                        {% for year in year_stats %}
-                        <a href="#year-{{ year.year }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
-                            <span>{{ year.year }}</span>
-                            <span class="badge bg-primary rounded-pill">{{ year.count }}</span>
-                        </a>
-                        {% endfor %}
-                    </div>
-                </div>
-            </div>
-
-            <!-- 2. 家庭成员 -->
-            <div class="card mb-3">
-                <div class="card-header bg-info text-white">
-                    <i class="bi bi-people"></i> 家庭成员
-                </div>
-                <div class="card-body p-2">
-                    <div class="list-group list-group-flush">
-                        {% for person in persons_data %}
-                        <a href="#person-{{ person.person_name }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
-                            <span>{{ person.person_name }}</span>
-                            <span class="badge bg-info rounded-pill">{{ person.count }}</span>
-                        </a>
-                        {% endfor %}
-                    </div>
-                </div>
-            </div>
-
-            <!-- 3. 拍摄设备 -->
-            <div class="card mb-3">
-                <div class="card-header bg-secondary text-white">
-                    <i class="bi bi-camera"></i> 拍摄设备
-                </div>
-                <div class="card-body p-2">
-                    <div class="list-group list-group-flush">
-                        {% for cam in camera_stats %}
-                        <a href="#camera-{{ cam.make }}-{{ cam.model }}" class="list-group-item list-group-item-action small">
-                            <div>{{ cam.make }} {{ cam.model }}</div>
-                            <span class="badge bg-secondary float-end">{{ cam.count }}</span>
-                        </a>
-                        {% endfor %}
-                    </div>
-                </div>
-            </div>
-
-            <!-- 4. 地点 -->
-            <div class="card">
-                <div class="card-header bg-success text-white">
-                    <i class="bi bi-geo-alt"></i> 地点
-                </div>
-                <div class="card-body p-2">
-                    <a href="#outdoor" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center mb-2">
-                        <span><i class="bi bi-sun"></i> 户外</span>
-                        <span class="badge bg-success rounded-pill">{{ location_stats.outdoor }}</span>
-                    </a>
-                    <a href="#indoor" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
-                        <span><i class="bi bi-house"></i> 室内</span>
-                        <span class="badge bg-warning text-dark rounded-pill">{{ location_stats.indoor }}</span>
-                    </a>
-                </div>
-            </div>
-        </div>
+<div class="page-head">
+    <div>
+        <h1 class="page-title">浏览</h1>
+        <p class="page-sub">按时间、人物、设备、地点浏览照片</p>
     </div>
+</div>
 
-    <!-- 右侧子分类缩略图集合 -->
-    <div class="col-md-9 col-lg-10">
-
-        <!-- 拍摄时间 - 子分类缩略图集合 -->
-        <div id="year-section">
-            <h4 class="mb-3"><i class="bi bi-calendar"></i> 拍摄时间</h4>
+<div class="browse-wrap">
+    <!-- 左侧导航 -->
+    <aside class="rail">
+        <div>
+            <div class="rail-group-title">拍摄时间</div>
             {% for year in year_stats %}
-            <div class="card mb-4" id="year-{{ year.year }}">
-                <div class="card-header d-flex justify-content-between align-items-center bg-light">
-                    <h5 class="mb-0">{{ year.year }}年</h5>
-                    <span class="badge bg-primary">{{ year.count }} 张</span>
-                </div>
-                <div class="card-body">
-                    <div class="photo-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.75rem;">
-                        {% for img in year.preview_images %}
-                        <div class="photo-card card">
-                            <a href="/image/{{ img.id }}">
-                                <div class="thumbnail-container">
-                                    <img data-src="/api/thumbnail/{{ img.id }}" data-id="{{ img.id }}" class="lazy-image" alt="Photo" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 150 120'%3E%3Crect fill='%23f0f0f0' width='150' height='120'/%3E%3Ctext fill='%23999' x='50%25' y='50%25' text-anchor='middle' dy='.3em'%3E加载...%3C/text%3E%3C/svg%3E">
-                                </div>
-                            </a>
-                        </div>
-                        {% endfor %}
-                    </div>
-                    {% if year.count > 12 %}
-                    <div class="text-center mt-2">
-                        <a href="/images?year={{ year.year }}" class="btn btn-sm btn-outline-primary">
-                            查看全部 {{ year.count }} 张照片 <i class="bi bi-arrow-right"></i>
-                        </a>
-                    </div>
-                    {% endif %}
-                </div>
-            </div>
+            <a href="#year-{{ year.year }}" class="rail-link">
+                <span>{{ year.year }} 年</span><span class="cnt">{{ year.count }}</span>
+            </a>
             {% endfor %}
         </div>
-
-        <!-- 家庭成员 - 子分类缩略图集合 -->
-        <div id="person-section">
-            <h4 class="mb-3"><i class="bi bi-people"></i> 家庭成员</h4>
+        <div>
+            <div class="rail-group-title">家庭成员</div>
             {% for person in persons_data %}
-            <div class="card mb-4" id="person-{{ person.person_name }}">
-                <div class="card-header d-flex justify-content-between align-items-center bg-light">
-                    <h5 class="mb-0">{{ person.person_name }}</h5>
-                    <span class="badge bg-info">{{ person.count }} 张</span>
-                </div>
-                <div class="card-body">
-                    <div class="photo-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.75rem;">
-                        {% for img in person.preview_images %}
-                        <div class="photo-card card">
-                            <a href="/image/{{ img.id }}">
-                                <div class="thumbnail-container">
-                                    <img data-src="/api/thumbnail/{{ img.id }}" data-id="{{ img.id }}" class="lazy-image" alt="Photo" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 150 120'%3E%3Crect fill='%23f0f0f0' width='150' height='120'/%3E%3Ctext fill='%23999' x='50%25' y='50%25' text-anchor='middle' dy='.3em'%3E加载...%3C/text%3E%3C/svg%3E">
-                                </div>
-                            </a>
-                        </div>
-                        {% endfor %}
-                    </div>
-                    {% if person.count > 12 %}
-                    <div class="text-center mt-2">
-                        <a href="/images?person={{ person.person_name }}" class="btn btn-sm btn-outline-info">
-                            查看全部 {{ person.count }} 张照片 <i class="bi bi-arrow-right"></i>
-                        </a>
-                    </div>
-                    {% endif %}
-                </div>
-            </div>
+            <a href="#person-{{ person.person_name }}" class="rail-link">
+                <span>{{ person.person_name }}</span><span class="cnt">{{ person.count }}</span>
+            </a>
             {% endfor %}
         </div>
-
-        <!-- 拍摄设备 - 子分类缩略图集合 -->
-        <div id="camera-section">
-            <h4 class="mb-3"><i class="bi bi-camera"></i> 拍摄设备</h4>
+        <div>
+            <div class="rail-group-title">拍摄设备</div>
             {% for cam in camera_stats %}
-            <div class="card mb-4" id="camera-{{ cam.make }}-{{ cam.model }}">
-                <div class="card-header d-flex justify-content-between align-items-center bg-light">
-                    <div>
-                        <h5 class="mb-0">{{ cam.make }}</h5>
-                        <small class="text-muted">{{ cam.model }}</small>
-                    </div>
-                    <span class="badge bg-secondary">{{ cam.count }} 张</span>
+            <a href="#camera-{{ cam.make }}-{{ cam.model }}" class="rail-link">
+                <span>{{ cam.make }} {{ cam.model[:16] }}{% if cam.model|length > 16 %}…{% endif %}</span>
+                <span class="cnt">{{ cam.count }}</span>
+            </a>
+            {% endfor %}
+        </div>
+        <div>
+            <div class="rail-group-title">地点</div>
+            <a href="#loc-outdoor" class="rail-link"><span>户外</span><span class="cnt">{{ location_stats.outdoor }}</span></a>
+            <a href="#loc-indoor" class="rail-link"><span>室内</span><span class="cnt">{{ location_stats.indoor }}</span></a>
+        </div>
+    </aside>
+
+    <!-- 内容区 -->
+    <div>
+        <!-- 年份 -->
+        <div class="sec">
+            <div class="sec-head"><h2 class="sec-title"><i class="bi bi-calendar3"></i> 拍摄时间</h2></div>
+            {% for year in year_stats %}
+            <div class="panel" id="year-{{ year.year }}" style="margin-bottom: 16px;">
+                <div class="panel-head">
+                    <span>{{ year.year }} 年</span>
+                    <span class="badge badge-accent">{{ year.count }} 张</span>
                 </div>
-                <div class="card-body">
-                    {% if cam.preview_image_id %}
-                    <div class="photo-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.75rem;">
-                        <div class="photo-card card">
-                            <a href="/images?camera={{ cam.make }}+{{ cam.model }}">
-                                <div class="thumbnail-container">
-                                    <img data-src="/api/thumbnail/{{ cam.preview_image_id }}" data-id="{{ cam.preview_image_id }}" class="lazy-image" alt="sample" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 150 120'%3E%3Crect fill='%23f0f0f0' width='150' height='120'/%3E%3Ctext fill='%23999' x='50%25' y='50%25' text-anchor='middle' dy='.3em'%3E加载...%3C/text%3E%3C/svg%3E">
-                                </div>
-                            </a>
+                {% if year.preview_images %}
+                <div class="panel-body flush">
+                    <div class="pgrid compact">
+                        {% for img in year.preview_images %}
+                        <div class="ptile" data-group="year" data-id="{{ img.id }}">
+                            <img src="data:image/jpeg;base64,{{ img.thumbnail }}" alt="{{ year.year }}年照片" loading="lazy">
                         </div>
+                        {% endfor %}
                     </div>
-                    {% endif %}
-                    <div class="text-center mt-2">
-                        <a href="/images?camera={{ cam.make }}+{{ cam.model }}" class="btn btn-sm btn-outline-secondary">
-                            查看全部 {{ cam.count }} 张照片 <i class="bi bi-arrow-right"></i>
-                        </a>
+                </div>
+                {% endif %}
+                {% if year.count > 12 %}
+                <div class="panel-body" style="text-align: center; padding-top: 8px;">
+                    <a href="/images?year={{ year.year }}" class="btn btn-outline btn-sm">查看全部 {{ year.count }} 张 <i class="bi bi-arrow-right"></i></a>
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- 人物 -->
+        <div class="sec">
+            <div class="sec-head"><h2 class="sec-title"><i class="bi bi-people"></i> 家庭成员</h2></div>
+            {% for person in persons_data %}
+            <div class="panel" id="person-{{ person.person_name }}" style="margin-bottom: 16px;">
+                <div class="panel-head">
+                    <span>{{ person.person_name }}</span>
+                    <span class="badge badge-accent">{{ person.count }} 张</span>
+                </div>
+                {% if person.preview_images %}
+                <div class="panel-body flush">
+                    <div class="pgrid compact">
+                        {% for img in person.preview_images %}
+                        <div class="ptile" data-group="person" data-id="{{ img.id }}">
+                            <img src="data:image/jpeg;base64,{{ img.thumbnail }}" alt="{{ person.person_name }}" loading="lazy">
+                        </div>
+                        {% endfor %}
                     </div>
+                </div>
+                {% endif %}
+                <div class="panel-body" style="text-align: center; padding-top: 8px;">
+                    <a href="/person/{{ person.person_name }}" class="btn btn-outline btn-sm">查看全部 {{ person.count }} 张 <i class="bi bi-arrow-right"></i></a>
                 </div>
             </div>
             {% endfor %}
         </div>
 
-        <!-- 地点 - 子分类缩略图集合 -->
-        <div id="location-section">
-            <h4 class="mb-3"><i class="bi bi-geo-alt"></i> 地点</h4>
-
-            <!-- 户外 -->
-            <div id="outdoor" class="card mb-4">
-                <div class="card-header d-flex justify-content-between align-items-center bg-success text-white">
-                    <h5 class="mb-0"><i class="bi bi-sun"></i> 户外</h5>
-                    <span class="badge bg-light text-dark">{{ location_stats.outdoor }} 张</span>
-                </div>
-                <div class="card-body">
-                    <div class="photo-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.75rem;">
-                        {% for img in location_stats.outdoor_preview %}
-                        <div class="photo-card card">
-                            <a href="/image/{{ img.id }}">
-                                <div class="thumbnail-container">
-                                    <img data-src="/api/thumbnail/{{ img.id }}" data-id="{{ img.id }}" class="lazy-image" alt="Photo" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 150 120'%3E%3Crect fill='%23f0f0f0' width='150' height='120'/%3E%3Ctext fill='%23999' x='50%25' y='50%25' text-anchor='middle' dy='.3em'%3E加载...%3C/text%3E%3C/svg%3E">
-                                </div>
-                            </a>
+        <!-- 设备 -->
+        <div class="sec">
+            <div class="sec-head"><h2 class="sec-title"><i class="bi bi-camera"></i> 拍摄设备</h2></div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px;">
+                {% for cam in camera_stats %}
+                <div class="panel" id="camera-{{ cam.make }}-{{ cam.model }}">
+                    {% if cam.preview_thumbnail %}
+                    <div class="ptile" style="aspect-ratio: 16/9; border-radius: 0;"
+                         onclick="location.href='/images?camera={{ cam.make }}+{{ cam.model }}'">
+                        <img src="data:image/jpeg;base64,{{ cam.preview_thumbnail }}" alt="{{ cam.make }} {{ cam.model }}" loading="lazy">
+                    </div>
+                    {% endif %}
+                    <div class="panel-body" style="display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+                        <div style="min-width: 0;">
+                            <div style="font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ cam.make }}</div>
+                            <div style="font-size: 12px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ cam.model }}</div>
                         </div>
-                        {% endfor %}
-                    </div>
-                    <div class="text-center mt-2">
-                        <a href="/images?location=outdoor" class="btn btn-sm btn-outline-success">
-                            查看全部 {{ location_stats.outdoor }} 张照片 <i class="bi bi-arrow-right"></i>
-                        </a>
+                        <a href="/images?camera={{ cam.make }}+{{ cam.model }}" class="badge badge-accent" style="text-decoration: none;">{{ cam.count }} 张</a>
                     </div>
                 </div>
+                {% endfor %}
             </div>
+        </div>
 
-            <!-- 室内 -->
-            <div id="indoor" class="card mb-4">
-                <div class="card-header d-flex justify-content-between align-items-center bg-warning">
-                    <h5 class="mb-0"><i class="bi bi-house"></i> 室内</h5>
-                    <span class="badge bg-dark">{{ location_stats.indoor }} 张</span>
-                </div>
-                <div class="card-body">
-                    <div class="photo-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.75rem;">
-                        {% for img in location_stats.indoor_preview %}
-                        <div class="photo-card card">
-                            <a href="/image/{{ img.id }}">
-                                <div class="thumbnail-container">
-                                    <img data-src="/api/thumbnail/{{ img.id }}" data-id="{{ img.id }}" class="lazy-image" alt="Photo" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 150 120'%3E%3Crect fill='%23f0f0f0' width='150' height='120'/%3E%3Ctext fill='%23999' x='50%25' y='50%25' text-anchor='middle' dy='.3em'%3E加载...%3C/text%3E%3C/svg%3E">
-                                </div>
-                            </a>
-                        </div>
-                        {% endfor %}
+        <!-- 地点 -->
+        <div class="sec">
+            <div class="sec-head"><h2 class="sec-title"><i class="bi bi-geo-alt"></i> 地点</h2></div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px;">
+                <div class="panel" id="loc-outdoor">
+                    <div class="panel-head">
+                        <span><i class="bi bi-sun" style="color: var(--accent);"></i> 户外</span>
+                        <span class="badge">{{ location_stats.outdoor }} 张</span>
                     </div>
-                    <div class="text-center mt-2">
-                        <a href="/images?location=indoor" class="btn btn-sm btn-outline-warning text-dark">
-                            查看全部 {{ location_stats.indoor }} 张照片 <i class="bi bi-arrow-right"></i>
-                        </a>
+                    {% if location_stats.outdoor_preview %}
+                    <div class="panel-body flush">
+                        <div class="pgrid compact">
+                            {% for img in location_stats.outdoor_preview %}
+                            <div class="ptile" data-group="outdoor" data-id="{{ img.id }}">
+                                <img src="data:image/jpeg;base64,{{ img.thumbnail }}" alt="户外照片" loading="lazy">
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                    <div class="panel-body" style="text-align: center; padding-top: 8px;">
+                        <a href="/images?location=outdoor" class="btn btn-outline btn-sm">查看全部 <i class="bi bi-arrow-right"></i></a>
+                    </div>
+                </div>
+                <div class="panel" id="loc-indoor">
+                    <div class="panel-head">
+                        <span><i class="bi bi-house" style="color: var(--accent);"></i> 室内</span>
+                        <span class="badge">{{ location_stats.indoor }} 张</span>
+                    </div>
+                    {% if location_stats.indoor_preview %}
+                    <div class="panel-body flush">
+                        <div class="pgrid compact">
+                            {% for img in location_stats.indoor_preview %}
+                            <div class="ptile" data-group="indoor" data-id="{{ img.id }}">
+                                <img src="data:image/jpeg;base64,{{ img.thumbnail }}" alt="室内照片" loading="lazy">
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                    <div class="panel-body" style="text-align: center; padding-top: 8px;">
+                        <a href="/images?location=indoor" class="btn btn-outline btn-sm">查看全部 <i class="bi bi-arrow-right"></i></a>
                     </div>
                 </div>
             </div>
         </div>
-
     </div>
 </div>
-
-<!-- 预取状态指示器 -->
-<div id="prefetch-status" class="position-fixed bottom-0 end-0 m-3" style="display: none;">
-    <div class="card shadow-sm">
-        <div class="card-body py-2 px-3">
-            <small class="text-muted">
-                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
-                正在预取照片...
-            </small>
-        </div>
-    </div>
-</div>
-{% endblock %}
-
-{% block extra_css %}
-<style>
-    .sticky-top {
-        scrollbar-width: thin;
-    }
-
-    .photo-card img {
-        width: 100%;
-        height: 120px;
-        object-fit: cover;
-        transition: transform 0.2s;
-    }
-
-    .photo-card:hover img {
-        transform: scale(1.05);
-    }
-
-    .photo-card {
-        cursor: pointer;
-    }
-
-    /* 懒加载图片淡入效果 */
-    .lazy-image {
-        opacity: 0;
-        transition: opacity 0.3s ease-in;
-    }
-
-    .lazy-image.loaded {
-        opacity: 1;
-    }
-
-    /* 缩略图骨架屏效果 */
-    .thumbnail-container {
-        background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-        background-size: 200% 100%;
-        animation: shimmer 1.5s infinite;
-    }
-
-    .thumbnail-container.loaded {
-        animation: none;
-        background: none;
-    }
-
-    @keyframes shimmer {
-        0% { background-position: 200% 0; }
-        100% { background-position: -200% 0; }
-    }
-</style>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-    // 图片懒加载和预取管理器
-    class ImagePrefetcher {
-        constructor() {
-            this.imageQueue = [];
-            this.processing = false;
-            this.loadedImages = new Set();
-            this.observer = null;
-            this.prefetchQueue = [];
-            this.prefetching = false;
-        }
+    // 分组图片数据
+    var allImages = {
+        year: [
+            {% for year in year_stats %}{% for img in year.preview_images %}
+            { id: {{ img.id }}, src: 'data:image/jpeg;base64,{{ img.thumbnail }}', caption: '{{ year.year }}年', url: '/image/{{ img.id }}' },
+            {% endfor %}{% endfor %}
+        ],
+        person: [
+            {% for person in persons_data %}{% for img in person.preview_images %}
+            { id: {{ img.id }}, src: 'data:image/jpeg;base64,{{ img.thumbnail }}', caption: '{{ person.person_name }}', url: '/image/{{ img.id }}' },
+            {% endfor %}{% endfor %}
+        ],
+        outdoor: [
+            {% for img in location_stats.outdoor_preview %}
+            { id: {{ img.id }}, src: 'data:image/jpeg;base64,{{ img.thumbnail }}', caption: '户外', url: '/image/{{ img.id }}' },
+            {% endfor %}
+        ],
+        indoor: [
+            {% for img in location_stats.indoor_preview %}
+            { id: {{ img.id }}, src: 'data:image/jpeg;base64,{{ img.thumbnail }}', caption: '室内', url: '/image/{{ img.id }}' },
+            {% endfor %}
+        ]
+    };
 
-        // 初始化懒加载（使用 Intersection Observer）
-        initLazyLoading() {
-            this.observer = new IntersectionObserver((entries) => {
-                entries.forEach(entry => {
-                    if (entry.isIntersecting) {
-                        this.loadImage(entry.target);
-                        this.observer.unobserve(entry.target);
-                    }
-                });
-            }, {
-                rootMargin: '50px 0px',
-                threshold: 0.01
-            });
+    document.addEventListener('click', function (e) {
+        var tile = e.target.closest('.ptile[data-group]');
+        if (!tile) return;
+        var images = allImages[tile.dataset.group] || [];
+        var id = parseInt(tile.dataset.id, 10);
+        var idx = images.findIndex(function (img) { return img.id === id; });
+        if (idx >= 0 && window.lightbox) lightbox.open(idx, images);
+    });
 
-            // 观察所有懒加载图片
-            document.querySelectorAll('.lazy-image').forEach(img => {
-                this.observer.observe(img);
-            });
-        }
-
-        // 加载单张图片
-        loadImage(img) {
-            const src = img.dataset.src;
-            const id = img.dataset.id;
-
-            if (!src || this.loadedImages.has(id)) return;
-
-            fetch(src)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.thumbnail) {
-                        img.src = 'data:image/jpeg;base64,' + data.thumbnail;
-                        img.classList.add('loaded');
-                        img.parentElement.parentElement.classList.add('loaded');
-                        this.loadedImages.add(id);
-                    }
-                })
-                .catch(err => console.error('Error loading image:', err));
-        }
-
-        // 批量预取图片
-        prefetchImages(imageIds) {
-            const idsToFetch = imageIds.filter(id => !this.loadedImages.has(id));
-            if (idsToFetch.length === 0) return;
-
-            this.prefetchQueue.push(...idsToFetch);
-            this.processPrefetchQueue();
-        }
-
-        // 处理预取队列
-        processPrefetchQueue() {
-            if (this.prefetching || this.prefetchQueue.length === 0) return;
-
-            this.prefetching = true;
-            this.showPrefetchStatus();
-
-            const batch = this.prefetchQueue.splice(0, 20);
-
-            fetch('/api/thumbnails/batch', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ image_ids: batch })
-            })
-            .then(response => response.json())
-            .then(data => {
-                data.thumbnails.forEach(item => {
-                    if (item.thumbnail) {
-                        const img = document.querySelector(`.lazy-image[data-id="${item.id}"]`);
-                        if (img && !this.loadedImages.has(item.id)) {
-                            img.src = 'data:image/jpeg;base64,' + item.thumbnail;
-                            img.classList.add('loaded');
-                            img.parentElement.parentElement.classList.add('loaded');
-                            this.loadedImages.add(item.id);
-                        }
-                    }
-                    this.loadedImages.add(item.id);
-                });
-                this.prefetching = false;
-                this.hidePrefetchStatus();
-
-                if (this.prefetchQueue.length > 0) {
-                    setTimeout(() => this.processPrefetchQueue(), 100);
-                }
-            })
-            .catch(err => {
-                console.error('Error prefetching images:', err);
-                this.prefetching = false;
-                this.hidePrefetchStatus();
-            });
-        }
-
-        // 智能预取
-        initSmartPrefetch() {
-            let ticking = false;
-            window.addEventListener('scroll', () => {
-                if (!ticking) {
-                    window.requestAnimationFrame(() => {
-                        this.checkPrefetchTrigger();
-                        ticking = false;
-                    });
-                    ticking = true;
-                }
-            });
-        }
-
-        // 检查是否需要触发预取
-        checkPrefetchTrigger() {
-            const scrollTop = window.scrollY;
-            const windowHeight = window.innerHeight;
-            const docHeight = document.documentElement.scrollHeight;
-
-            if (scrollTop + windowHeight > docHeight * 0.7) {
-                const allImageIds = [];
-                document.querySelectorAll('.lazy-image').forEach(img => {
-                    const id = parseInt(img.dataset.id);
-                    if (id && !this.loadedImages.has(id)) {
-                        allImageIds.push(id);
-                    }
-                });
-
-                if (allImageIds.length > 0) {
-                    this.prefetchImages(allImageIds);
-                }
-            }
-        }
-
-        showPrefetchStatus() {
-            const status = document.getElementById('prefetch-status');
-            if (status) status.style.display = 'block';
-        }
-
-        hidePrefetchStatus() {
-            const status = document.getElementById('prefetch-status');
-            if (status) {
-                setTimeout(() => {
-                    status.style.display = 'none';
-                }, 500);
-            }
-        }
-    }
-
-    // 初始化
-    document.addEventListener('DOMContentLoaded', function() {
-        const prefetcher = new ImagePrefetcher();
-        prefetcher.initLazyLoading();
-        prefetcher.initSmartPrefetch();
-
-        // 平滑滚动
-        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-            anchor.addEventListener('click', function (e) {
-                e.preventDefault();
-                const targetId = this.getAttribute('href');
-                const target = document.querySelector(targetId);
-                if (target) {
-                    target.scrollIntoView({
-                        behavior: 'smooth',
-                        block: 'start'
-                    });
-                }
-            });
+    // 平滑滚动
+    document.querySelectorAll('.rail-link[href^="#"]').forEach(function (a) {
+        a.addEventListener('click', function (e) {
+            e.preventDefault();
+            var target = document.querySelector(this.getAttribute('href'));
+            if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
         });
     });
 </script>
