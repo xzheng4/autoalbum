@@ -9,14 +9,45 @@ PROJECT_ROOT = Path(__file__).parent.parent
 
 # 数据目录
 DATA_DIR = PROJECT_ROOT / "data"
-PHOTOS_DIR = Path("/mnt/nfs/photos")  # 默认照片库位置
 FACES_DIR = DATA_DIR / "faces"
 DATABASE_PATH = DATA_DIR / "autoalbum.db"
 
-# 确保目录存在
+# 确保基础目录存在
 DATA_DIR.mkdir(exist_ok=True)
-PHOTOS_DIR.mkdir(exist_ok=True)
 FACES_DIR.mkdir(exist_ok=True)
+
+# 照片目录 - 可能是 NFS 挂载点，不强制创建
+# 支持通过环境变量 PHOTOS_DIR 覆盖
+photos_dir_env = os.environ.get("PHOTOS_DIR")
+if photos_dir_env:
+    PHOTOS_DIR = Path(photos_dir_env)
+
+# 默认 NFS 路径
+_default_photos_dir = Path("/mnt/nfs/photos")
+
+# 检查目录是否可访问
+def _check_photos_dir(path: Path) -> bool:
+    """检查照片目录是否可访问"""
+    try:
+        # 检查目录是否存在
+        if not path.exists():
+            return False
+        # 尝试列出目录内容来验证可访问性
+        list(path.iterdir())
+        return True
+    except (OSError, PermissionError):
+        return False
+
+# 确定最终的照片目录
+if 'PHOTOS_DIR' not in locals() or not _check_photos_dir(PHOTOS_DIR):
+    if _check_photos_dir(_default_photos_dir):
+        PHOTOS_DIR = _default_photos_dir
+    else:
+        # NFS 不可访问时，使用本地备用目录
+        print(f"Warning: /mnt/nfs/photos not accessible")
+        PHOTOS_DIR = DATA_DIR / "photos"
+        PHOTOS_DIR.mkdir(exist_ok=True)
+        print(f"Using fallback photos directory: {PHOTOS_DIR}")
 
 # 照片分析配置
 ANALYZER_CONFIG = {
