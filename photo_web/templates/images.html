@@ -4,16 +4,21 @@
 {% block content %}
 <div class="page-head">
     <div>
-        <h1 class="page-title">照片列表</h1>
-        <p class="page-sub">{{ total }} 张照片
-            {% if request.args.get('year') %} · {{ request.args.get('year') }} 年{% endif %}
-            {% if request.args.get('person') %} · {{ request.args.get('person') }}{% endif %}
-            {% if request.args.get('category') %} · {{ request.args.get('category') }}{% endif %}
-            {% if request.args.get('location') %} · {{ '户外' if request.args.get('location') == 'outdoor' else '室内' }}{% endif %}
-            {% if request.args.get('camera') %} · {{ request.args.get('camera') | replace('+', ' ') }}{% endif %}
-        </p>
+        <h1 class="page-title">
+            {% if request.args.get('category') %}{{ request.args.get('category') }}
+            {% elif request.args.get('mood') %}{{ request.args.get('mood') }}
+            {% elif request.args.get('location') %}{{ '户外' if request.args.get('location') == 'outdoor' else '室内' }}
+            {% elif request.args.get('person') %}{{ request.args.get('person') }}
+            {% elif request.args.get('year') %}{{ request.args.get('year') }} 年
+            {% elif request.args.get('camera') %}{{ request.args.get('camera') | replace('+', ' ') }}
+            {% else %}全部照片{% endif %}
+        </h1>
+        <p class="page-sub">共 {{ total }} 张</p>
     </div>
-    <a href="/browse" class="btn btn-outline btn-sm"><i class="bi bi-compass"></i> 浏览</a>
+    <div style="display: flex; gap: 8px;">
+        <a href="/browse" class="btn btn-outline btn-sm"><i class="bi bi-compass"></i> 浏览</a>
+        <a href="/gallery" class="btn btn-outline btn-sm"><i class="bi bi-grid"></i> 画廊</a>
+    </div>
 </div>
 
 {% if images %}
@@ -23,12 +28,37 @@
         {% if img.thumbnail %}
         <img src="data:image/jpeg;base64,{{ img.thumbnail }}" alt="照片 {{ img.id }}" loading="lazy">
         {% endif %}
-        {% if img.captured_at %}
-        <span class="ptile-meta"><i class="bi bi-calendar3"></i> {{ img.captured_at[:10] }}</span>
-        {% endif %}
+        <span class="ptile-meta"><i class="bi bi-calendar3"></i> {{ img.captured_at[:10] if img.captured_at else '未知日期' }}</span>
     </div>
     {% endfor %}
 </div>
+
+<!-- 分页（保留筛选参数） -->
+{% if total_pages > 1 %}
+{% set qs = request.query_string.decode() | replace('page=' ~ page, '') | replace('&&', '&') | trim('&') %}
+{% set base_qs = (qs + '&') if qs else '' %}
+<nav aria-label="分页">
+    <ul class="pagination">
+        <li>
+            <a class="pagination-item {% if page <= 1 %}disabled{% endif %}"
+               href="/images?{{ base_qs }}page={{ page - 1 }}" aria-label="上一页"><i class="bi bi-chevron-left"></i></a>
+        </li>
+        {% for p in range(1, total_pages + 1) %}
+            {% if p == page %}
+            <li><span class="pagination-item active">{{ p }}</span></li>
+            {% elif p == 1 or p == total_pages or (p >= page - 2 and p <= page + 2) %}
+            <li><a class="pagination-item" href="/images?{{ base_qs }}page={{ p }}">{{ p }}</a></li>
+            {% elif p == page - 3 or p == page + 3 %}
+            <li><span class="pagination-item disabled">…</span></li>
+            {% endif %}
+        {% endfor %}
+        <li>
+            <a class="pagination-item {% if page >= total_pages %}disabled{% endif %}"
+               href="/images?{{ base_qs }}page={{ page + 1 }}" aria-label="下一页"><i class="bi bi-chevron-right"></i></a>
+        </li>
+    </ul>
+</nav>
+{% endif %}
 {% else %}
 <div class="empty-state">
     <div class="empty-state-icon"><i class="bi bi-images"></i></div>

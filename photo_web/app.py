@@ -77,66 +77,30 @@ def image_to_base64(image_path: str, size: tuple = None) -> str:
 
 @app.route("/")
 def index():
-    """首页 - 浏览页面（左边分类导航，右边照片集合）"""
-    # 获取 5 大类分类数据
-    year_stats = db.get_year_stats()  # 按时间（年份）
-    persons_data = db.get_person_stats_with_images()  # 按人物
-    camera_stats = db.get_camera_stats_detailed()  # 按拍摄设备
-    location_stats = db.get_location_stats()  # 户外/室内
+    """首页 - 问候 + 统计 + 成员 + 最近照片"""
+    total_images = db.get_image_count()
+    processed_images = db.get_processed_count()
+    persons = db.get_all_persons()
 
-    # 为每个年份获取预览图片（只获取 ID 和基本信息，缩略图懒加载）
-    for year in year_stats:
-        images = db.get_images_by_year(year["year"], limit=12)
-        year["preview_images"] = [{
-            'id': img['id'],
-            'file_path': img['file_path'],
-            'captured_at': img.get('captured_at', '')
-        } for img in images]
+    # 按日期分组，每天取前 8 张做预览
+    date_groups = db.get_images_grouped_by_date(limit=20)
+    for group in date_groups:
+        ids = group.get('ids', '')
+        group['preview_images'] = []
+        if ids:
+            for img_id in ids.split(',')[:8]:
+                img = db.get_image_by_id(int(img_id))
+                if img and os.path.exists(img['file_path']):
+                    group['preview_images'].append({
+                        'id': img['id'],
+                        'thumbnail': image_to_base64(img['file_path'])
+                    })
 
-    # 为每个人物获取预览图片
-    for person in persons_data:
-        images = db.get_images_by_person(person["person_name"])[:12]
-        person["preview_images"] = [{
-            'id': img['id'],
-            'file_path': img['file_path'],
-            'captured_at': img.get('captured_at', '')
-        } for img in images]
-
-    # 为每个设备获取预览图片
-    for cam in camera_stats:
-        if cam["sample_image_id"]:
-            img = db.get_image_by_id(cam["sample_image_id"])
-            if img:
-                cam["preview_image_id"] = img['id']
-                cam["preview_image_path"] = img['file_path']
-            else:
-                cam["preview_image_id"] = None
-                cam["preview_image_path"] = None
-        else:
-            cam["preview_image_id"] = None
-            cam["preview_image_path"] = None
-
-    # 获取户外/室内预览图片
-    outdoor_images = db.get_images_by_location_type("outdoor", limit=12)
-    indoor_images = db.get_images_by_location_type("indoor", limit=12)
-
-    location_stats["outdoor_preview"] = [{
-        'id': img['id'],
-        'file_path': img['file_path'],
-        'captured_at': img.get('captured_at', '')
-    } for img in outdoor_images]
-
-    location_stats["indoor_preview"] = [{
-        'id': img['id'],
-        'file_path': img['file_path'],
-        'captured_at': img.get('captured_at', '')
-    } for img in indoor_images]
-
-    return render_template("home.html",
-                           year_stats=year_stats,
-                           persons_data=persons_data,
-                           camera_stats=camera_stats,
-                           location_stats=location_stats)
+    return render_template("index.html",
+                           total_images=total_images,
+                           processed_images=processed_images,
+                           persons=persons,
+                           date_groups=date_groups)
 
 
 @app.route("/gallery")
@@ -513,6 +477,20 @@ def api_thumbnail(image_id):
         "id": image_id,
         "thumbnail": thumbnail
     })
+
+
+@app.route("/thumb/<int:image_id>")
+def thumb(image_id):
+    """二进制缩略图（供 <img src> 直接使用，带 HTTP 缓存）"""
+    img = db.get_image_by_id(image_id)
+    if not img or not os.path.exists(img['file_path']):
+        return "Not found", 404
+    data = get_thumbnail(img['file_path'])
+    if not data:
+        return "Not found", 404
+    resp = app.response_class(data, mimetype="image/jpeg")
+    resp.headers["Cache-Control"] = "private, max-age=86400"
+    return resp
 
 
 @app.route("/api/thumbnails/batch", methods=["POST"])

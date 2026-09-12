@@ -60,7 +60,7 @@
                     <div class="pgrid compact">
                         {% for img in year.preview_images %}
                         <div class="ptile" data-group="year" data-id="{{ img.id }}">
-                            <img src="data:image/jpeg;base64,{{ img.thumbnail }}" alt="{{ year.year }}年照片" loading="lazy">
+                            <img src="/thumb/{{ img.id }}" alt="{{ year.year }}年照片" loading="lazy">
                         </div>
                         {% endfor %}
                     </div>
@@ -89,7 +89,7 @@
                     <div class="pgrid compact">
                         {% for img in person.preview_images %}
                         <div class="ptile" data-group="person" data-id="{{ img.id }}">
-                            <img src="data:image/jpeg;base64,{{ img.thumbnail }}" alt="{{ person.person_name }}" loading="lazy">
+                            <img src="/thumb/{{ img.id }}" alt="{{ person.person_name }}" loading="lazy">
                         </div>
                         {% endfor %}
                     </div>
@@ -108,10 +108,10 @@
             <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px;">
                 {% for cam in camera_stats %}
                 <div class="panel" id="camera-{{ cam.make }}-{{ cam.model }}">
-                    {% if cam.preview_thumbnail %}
+                    {% if cam.preview_image_id %}
                     <div class="ptile" style="aspect-ratio: 16/9; border-radius: 0;"
                          onclick="location.href='/images?camera={{ cam.make }}+{{ cam.model }}'">
-                        <img src="data:image/jpeg;base64,{{ cam.preview_thumbnail }}" alt="{{ cam.make }} {{ cam.model }}" loading="lazy">
+                        <img src="/thumb/{{ cam.preview_image_id }}" alt="{{ cam.make }} {{ cam.model }}" loading="lazy">
                     </div>
                     {% endif %}
                     <div class="panel-body" style="display: flex; align-items: center; justify-content: space-between; gap: 10px;">
@@ -140,7 +140,7 @@
                         <div class="pgrid compact">
                             {% for img in location_stats.outdoor_preview %}
                             <div class="ptile" data-group="outdoor" data-id="{{ img.id }}">
-                                <img src="data:image/jpeg;base64,{{ img.thumbnail }}" alt="户外照片" loading="lazy">
+                                <img src="/thumb/{{ img.id }}" alt="户外照片" loading="lazy">
                             </div>
                             {% endfor %}
                         </div>
@@ -160,7 +160,7 @@
                         <div class="pgrid compact">
                             {% for img in location_stats.indoor_preview %}
                             <div class="ptile" data-group="indoor" data-id="{{ img.id }}">
-                                <img src="data:image/jpeg;base64,{{ img.thumbnail }}" alt="室内照片" loading="lazy">
+                                <img src="/thumb/{{ img.id }}" alt="室内照片" loading="lazy">
                             </div>
                             {% endfor %}
                         </div>
@@ -182,22 +182,22 @@
     var allImages = {
         year: [
             {% for year in year_stats %}{% for img in year.preview_images %}
-            { id: {{ img.id }}, src: 'data:image/jpeg;base64,{{ img.thumbnail }}', caption: '{{ year.year }}年', url: '/image/{{ img.id }}' },
+            { id: {{ img.id }}, src: '/image/{{ img.id }}/full', caption: '{{ year.year }}年', url: '/image/{{ img.id }}' },
             {% endfor %}{% endfor %}
         ],
         person: [
             {% for person in persons_data %}{% for img in person.preview_images %}
-            { id: {{ img.id }}, src: 'data:image/jpeg;base64,{{ img.thumbnail }}', caption: '{{ person.person_name }}', url: '/image/{{ img.id }}' },
+            { id: {{ img.id }}, src: '/image/{{ img.id }}/full', caption: '{{ person.person_name }}', url: '/image/{{ img.id }}' },
             {% endfor %}{% endfor %}
         ],
         outdoor: [
             {% for img in location_stats.outdoor_preview %}
-            { id: {{ img.id }}, src: 'data:image/jpeg;base64,{{ img.thumbnail }}', caption: '户外', url: '/image/{{ img.id }}' },
+            { id: {{ img.id }}, src: '/image/{{ img.id }}/full', caption: '户外', url: '/image/{{ img.id }}' },
             {% endfor %}
         ],
         indoor: [
             {% for img in location_stats.indoor_preview %}
-            { id: {{ img.id }}, src: 'data:image/jpeg;base64,{{ img.thumbnail }}', caption: '室内', url: '/image/{{ img.id }}' },
+            { id: {{ img.id }}, src: '/image/{{ img.id }}/full', caption: '室内', url: '/image/{{ img.id }}' },
             {% endfor %}
         ]
     };
